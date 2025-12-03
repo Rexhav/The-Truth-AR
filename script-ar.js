@@ -4,9 +4,8 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
 
-// 1. DISTANCE: Increased to 3.0 meters
-// This creates distinct "stations" you must walk to.
-const PANEL_DISTANCE = 3.0; 
+// 1. DISTANCE: Set exactly to 2.1 meters
+const PANEL_DISTANCE = 2.1; 
 
 // --- TEXT DATA ---
 const STORY_TEXT = {
@@ -136,8 +135,8 @@ function checkProximity() {
     panelPositions.forEach(p => {
         const dist = Math.abs(camPos.z - p.z);
         
-        // 2. TRIGGER ZONE: Increased to 1.5m because panels are further apart
-        if (dist < 1.5) {
+        // 2. TRIGGER UPDATE: Reduced to 1.0m to prevent overlapping
+        if (dist < 1.0) {
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;
