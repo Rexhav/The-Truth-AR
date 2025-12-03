@@ -4,9 +4,8 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
 
-// 1. DISTANCE UPDATE: Reduced from 2.0 to 0.8 meters
-// This reduces the total walking distance from 22m to ~8.8m
-const PANEL_DISTANCE = 0.8; 
+// 1. DISTANCE: Reduced to 0.5 meters (Very compact steps)
+const PANEL_DISTANCE = 0.5; 
 
 // --- TEXT DATA ---
 const STORY_TEXT = {
@@ -32,7 +31,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// --- AR BUTTON (DOM OVERLAY ACTIVE) ---
+// --- AR BUTTON (DOM OVERLAY) ---
 const arButton = ARButton.createButton(renderer, {
     optionalFeatures: ['dom-overlay'], 
     domOverlay: { root: document.body } 
@@ -42,8 +41,11 @@ document.body.appendChild(arButton);
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
-// --- START LOGIC ---
+// --- BUTTON LOGIC ---
 arButton.addEventListener('click', () => {
+    // Hide the warning text when AR starts
+    document.getElementById('ar-warning').style.display = 'none';
+
     const bgMusic = document.getElementById('ar-bg-music');
     if(bgMusic) {
         bgMusic.volume = 0.2; 
@@ -55,7 +57,7 @@ arButton.addEventListener('click', () => {
     }
 });
 
-// --- AUDIO LOAD ---
+// --- LOAD AUDIO ---
 const audioLoader = new THREE.AudioLoader();
 const panelAudios = {}; 
 const audioPanels = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11];
@@ -76,8 +78,10 @@ const panelPositions = [];
 
 function createPanel(index, zPos) {
     const group = new THREE.Group();
-    // Height 0.8 is waist/chest level (Comfortable)
-    group.position.set(0, 0.8, -zPos); 
+    
+    // 2. HEIGHT FIX: Changed to -0.5
+    // This forces it DOWN relative to the phone start position.
+    group.position.set(0, -0.5, -zPos); 
 
     const layers = [
         { suffix: '_bg.png', z: -0.3, scale: 1.5 },
@@ -118,7 +122,7 @@ for (let i = 1; i <= TOTAL_PANELS; i++) {
 const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
 scene.add(light);
 
-// --- PROXIMITY LOGIC (TIGHTER ZONES) ---
+// --- PROXIMITY LOGIC (TIGHTER) ---
 const subtitleText = document.getElementById('subtitle-text');
 let currentActivePanel = -1;
 
@@ -132,10 +136,8 @@ function checkProximity() {
     panelPositions.forEach(p => {
         const dist = Math.abs(camPos.z - p.z);
         
-        // 2. TRIGGER UPDATE: Reduced from 1.5 to 0.6
-        // Since panels are only 0.8m apart, we need a tight trigger 
-        // so you don't hear Panel 2 while standing at Panel 1.
-        if (dist < 0.6) {
+        // 3. TRIGGER UPDATE: Reduced to 0.4 because gap is now 0.5
+        if (dist < 0.4) {
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;
