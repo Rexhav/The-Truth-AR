@@ -3,15 +3,13 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
-
-// 1. DISTANCE: 1.35 Meters (The sweet spot!)
 const PANEL_DISTANCE = 1.35; 
 
 // --- TEXT DATA ---
 const STORY_TEXT = {
     1: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br>“I have tried, Indra… but I cannot reach Him.”`,
     2: `<br>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
-    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Indra:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
+    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">YAMRAJ:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
     4: `<span class="speaker-name">Narration:</span>“And so, in divine play, Rama let His ring fall into the depths of the earth…<br>guiding Hanuman toward the truth of time itself.”<br><br><span class="speaker-name">Ram:</span>“Hanuman… my ring has slipped below.<br>Bring it back, dear one.”`,
     5: ``, 
     6: `“With folded hands and unquestioning love,<br>Hanuman bowed.”`,
@@ -43,7 +41,7 @@ camera.add(listener);
 
 // --- START LOGIC ---
 arButton.addEventListener('click', () => {
-    // Hide warning when started
+    // Hide warning
     const warning = document.getElementById('ar-warning');
     if (warning) warning.style.display = 'none';
 
@@ -79,8 +77,6 @@ const panelPositions = [];
 
 function createPanel(index, zPos) {
     const group = new THREE.Group();
-    
-    // HEIGHT: 0.0 (Neutral)
     group.position.set(0, 0.0, -zPos); 
 
     const layers = [
@@ -136,9 +132,10 @@ function checkProximity() {
     panelPositions.forEach(p => {
         const dist = Math.abs(camPos.z - p.z);
         
-        // 2. TRIGGER ZONE: Reduced to 0.6m
-        // Gap is 1.35m. Half is 0.67m. 0.6m ensures no overlap.
-        if (dist < 0.6) {
+        // 2. TRIGGER UPDATE: Increased to 1.0m
+        // This ensures audio starts playing much sooner as you approach.
+        // The "closestDist" logic ensures we don't play two at once.
+        if (dist < 1.0) {
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;
