@@ -4,13 +4,13 @@ import * as THREE from 'three';
 const TOTAL_PANELS = 11;
 const PANEL_SPACING = 30; 
 const SCROLL_SPEED = 0.08;
-const SENTENCE_DELAY_MS = 1500; 
+const SENTENCE_DELAY_MS = 1900; 
 
 // Text Data
 const STORY_TEXT = {
-    1: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br>“I have tried, Indra… but I cannot reach Him.”`,
-    2: `<br>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
-    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Indra:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
+    1: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br><span class="speaker-name">Yamraj:</span>“I have tried, Indra… but I cannot reach Him.”`,
+    2: `<br><span class="speaker-name">Yamraj</span>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
+    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Yamraj:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
     4: `<span class="speaker-name">Narration:</span>“And so, in divine play, Rama let His ring fall into the depths of the earth…<br>guiding Hanuman toward the truth of time itself.”<br><br><span class="speaker-name">Ram:</span>“Hanuman… my ring has slipped below.<br>Bring it back, dear one.”`,
     5: ``, 
     6: `“With folded hands and unquestioning love,<br>Hanuman bowed.”`,
@@ -44,7 +44,7 @@ const enterBtn = document.getElementById('enter-btn');
 const subtitleTextContainer = document.getElementById('subtitle-text');
 const scrollIndicator = document.getElementById('scroll-indicator');
 
-// GRAB THE HTML MUSIC PLAYER
+// 🔥 GRAB THE HTML PLAYER 🔥
 const bgMusicPlayer = document.getElementById('bg-music-player');
 
 manager.onProgress = (url, itemsLoaded, itemsTotal) => {
@@ -57,8 +57,8 @@ manager.onLoad = () => {
     enterBtn.innerHTML = "BEGIN LEGEND";
 };
 
-// --- AUDIO SYSTEM (VOICES) ---
-// We keep Three.js for the panel voices because they work fine
+// --- PANEL AUDIO (VOICES) ---
+// We keep Three.js for voices because they work fine
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
@@ -176,20 +176,20 @@ window.addEventListener('touchmove', (e) => {
     touchStart = e.touches[0].clientY;
 });
 
-// --- BUTTON LOGIC ---
+// --- BUTTON LOGIC (THE FIX) ---
 enterBtn.addEventListener('click', () => {
     loadingScreen.style.opacity = '0';
     scrollIndicator.style.opacity = '1'; 
     setTimeout(() => loadingScreen.remove(), 1000);
 
-    // 1. Resume Three.js Audio Context (For Voices)
+    // 1. Resume Three.js Audio (Voices)
     if (listener.context.state === 'suspended') {
         listener.context.resume();
     }
 
-    // 2. Play HTML5 BG Music (Reliable Method)
+    // 2. Play HTML BG Music (Reliable)
     if (bgMusicPlayer) {
-        bgMusicPlayer.volume = 0.4; // Set Volume Here
+        bgMusicPlayer.volume = 0.1; // Volume set to 0.1s
         bgMusicPlayer.play().catch(error => {
             console.log("Music play failed:", error);
         });
@@ -203,7 +203,7 @@ function animate() {
     currentScrollY += (targetScrollY - currentScrollY) * 0.05;
     camera.position.y = -currentScrollY;
 
-    // Scroll Indicator Logic
+    // Scroll Indicator
     if (scrollIndicator) {
         const fade = Math.max(0, 1 - (currentScrollY / 10));
         scrollIndicator.style.opacity = fade;
