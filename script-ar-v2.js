@@ -4,15 +4,14 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
 
-// 1. DISTANCE: Set to 1.6 meters
-// This reduces total walk length significantly.
-const PANEL_DISTANCE = 1.6; 
+// 1. DISTANCE: 1.5 Meters (About 2 steps per panel)
+const PANEL_DISTANCE = 1.5; 
 
 // --- TEXT DATA ---
 const STORY_TEXT = {
     1: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br>“I have tried, Indra… but I cannot reach Him.”`,
     2: `<br>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
-    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Indra:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
+    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Indra:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanumans devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
     4: `<span class="speaker-name">Narration:</span>“And so, in divine play, Rama let His ring fall into the depths of the earth…<br>guiding Hanuman toward the truth of time itself.”<br><br><span class="speaker-name">Ram:</span>“Hanuman… my ring has slipped below.<br>Bring it back, dear one.”`,
     5: ``, 
     6: `“With folded hands and unquestioning love,<br>Hanuman bowed.”`,
@@ -32,7 +31,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// --- AR BUTTON (DOM OVERLAY ACTIVE) ---
+// --- AR BUTTON ---
 const arButton = ARButton.createButton(renderer, {
     optionalFeatures: ['dom-overlay'], 
     domOverlay: { root: document.body } 
@@ -44,8 +43,8 @@ camera.add(listener);
 
 // --- START LOGIC ---
 arButton.addEventListener('click', () => {
-    const warning = document.getElementById('ar-warning');
-    if (warning) warning.style.display = 'none';
+    // Hide version text when started if you want, or keep it to be sure
+    // document.getElementById('version-check').style.display = 'none';
 
     const bgMusic = document.getElementById('ar-bg-music');
     if(bgMusic) {
@@ -80,7 +79,7 @@ const panelPositions = [];
 function createPanel(index, zPos) {
     const group = new THREE.Group();
     
-    // HEIGHT: 0.0 (Neutral/Chest Level)
+    // HEIGHT: 0.0 (Neutral)
     group.position.set(0, 0.0, -zPos); 
 
     const layers = [
@@ -136,9 +135,9 @@ function checkProximity() {
     panelPositions.forEach(p => {
         const dist = Math.abs(camPos.z - p.z);
         
-        // 2. TRIGGER UPDATE: Reduced to 0.8m
-        // Since panels are 1.6m apart, 0.8m is the perfect midpoint.
-        if (dist < 0.8) {
+        // 2. TRIGGER ZONE: Reduced to 0.7m
+        // Since panels are 1.5m apart, the trigger must be less than 0.75
+        if (dist < 0.7) {
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;

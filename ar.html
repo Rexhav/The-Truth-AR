@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Hanuman AR</title>
+    <title>Hanuman AR v2</title>
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
@@ -31,21 +31,18 @@
         
         #subtitle-text.visible { opacity: 1; }
 
-        /* NEW: Warning Instruction */
-        #ar-warning {
+        /* DEBUG VERSION TEXT (So you know it worked) */
+        #version-check {
             position: absolute;
-            top: 20%;
-            width: 100%;
-            text-align: center;
-            color: #FFD700;
-            z-index: 20;
-            pointer-events: none;
-            padding: 0 20px;
-            box-sizing: border-box;
+            top: 10px;
+            left: 10px;
+            color: lime;
+            font-family: sans-serif;
+            font-size: 12px;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 5px;
         }
-        
-        #ar-warning h2 { margin: 0; font-size: 1.5rem; text-transform: uppercase; }
-        #ar-warning p { font-family: sans-serif; font-size: 0.9rem; color: #fff; opacity: 0.8; }
 
     </style>
 
@@ -63,15 +60,12 @@
         <source src="assets/audio/bgmusic.mp3" type="audio/mpeg">
     </audio>
 
-    <div id="ar-warning">
-        <h2>Prepare Your Space</h2>
-        <p>Please start in a room (or hallway) where you can take 30-40 steps forward.</p>
-    </div>
+    <div id="version-check">v2.0 Loaded (Dist: 1.5m)</div>
 
     <div id="subtitle-container">
         <div id="subtitle-text"></div>
     </div>
 
-    <script type="module" src="script-ar.js?v=70"></script>
+    <script type="module" src="script-ar-v2.js"></script>
 </body>
 </html>
