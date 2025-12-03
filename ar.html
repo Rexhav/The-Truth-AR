@@ -5,8 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Hanuman AR</title>
     <style>
-        body { margin: 0; background-color: #000; overflow: hidden; }
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
+        
+        /* Subtitle Styling for Mobile AR */
+        #subtitle-container {
+            position: absolute;
+            bottom: 15%;
+            width: 90%;
+            left: 5%;
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        #subtitle-text {
+            color: #FFD700;
+            font-size: 1.2rem;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.3); /* Slight dark background for readability */
+            padding: 10px;
+            border-radius: 10px;
+            opacity: 0; /* Hidden by default */
+            transition: opacity 0.5s ease;
+        }
+        
+        #subtitle-text.visible { opacity: 1; }
+        
+        .speaker-name { font-weight: bold; display: block; margin-bottom: 5px; color: #FFF; }
     </style>
+
     <script type="importmap">
         {
             "imports": {
@@ -20,6 +47,10 @@
     <audio id="ar-bg-music" loop>
         <source src="assets/audio/bgmusic.mp3" type="audio/mpeg">
     </audio>
+
+    <div id="subtitle-container">
+        <div id="subtitle-text"></div>
+    </div>
 
     <script type="module" src="script-ar.js"></script>
 </body>
