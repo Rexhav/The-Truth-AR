@@ -4,9 +4,9 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
 
-// 1. DISTANCE: Increased to 1.2 meters (Perfect middle ground)
-// Not too cramped, not too far.
-const PANEL_DISTANCE = 1.2; 
+// 1. DISTANCE: Increased to 3.0 meters
+// This creates distinct "stations" you must walk to.
+const PANEL_DISTANCE = 3.0; 
 
 // --- TEXT DATA ---
 const STORY_TEXT = {
@@ -44,7 +44,6 @@ camera.add(listener);
 
 // --- START LOGIC ---
 arButton.addEventListener('click', () => {
-    // Hide warning
     const warning = document.getElementById('ar-warning');
     if (warning) warning.style.display = 'none';
 
@@ -81,9 +80,7 @@ const panelPositions = [];
 function createPanel(index, zPos) {
     const group = new THREE.Group();
     
-    // 2. HEIGHT FIX: Set to 0.0
-    // This is "Neutral" height (where you hold your phone)
-    // -0.5 was Stomach. 0.0 is roughly Chest/Face level.
+    // HEIGHT: 0.0 (Neutral/Chest Level)
     group.position.set(0, 0.0, -zPos); 
 
     const layers = [
@@ -139,9 +136,8 @@ function checkProximity() {
     panelPositions.forEach(p => {
         const dist = Math.abs(camPos.z - p.z);
         
-        // 3. TRIGGER UPDATE: Increased to 1.0
-        // Because the gap is 1.2m, triggering at 1.0m feels natural
-        if (dist < 1.0) {
+        // 2. TRIGGER ZONE: Increased to 1.5m because panels are further apart
+        if (dist < 1.5) {
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;
