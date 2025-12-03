@@ -280,7 +280,7 @@ function animate() {
     }
 
     renderer.render(scene, camera);
-}
+} 
 
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
