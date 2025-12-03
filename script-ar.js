@@ -3,7 +3,10 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
-const PANEL_DISTANCE = 2.0; // Panels are 2 meters apart deep into the screen
+
+// 1. DISTANCE UPDATE: Reduced from 2.0 to 0.8 meters
+// This reduces the total walking distance from 22m to ~8.8m
+const PANEL_DISTANCE = 0.8; 
 
 // --- TEXT DATA ---
 const STORY_TEXT = {
@@ -26,11 +29,10 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true; // Enable AR
+renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// --- AR BUTTON WITH DOM OVERLAY (CRITICAL FIX) ---
-// This ensures your HTML Subtitles stay visible in AR Mode
+// --- AR BUTTON (DOM OVERLAY ACTIVE) ---
 const arButton = ARButton.createButton(renderer, {
     optionalFeatures: ['dom-overlay'], 
     domOverlay: { root: document.body } 
@@ -40,22 +42,20 @@ document.body.appendChild(arButton);
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
-// --- START BUTTON LOGIC ---
+// --- START LOGIC ---
 arButton.addEventListener('click', () => {
-    // 1. Play Background Music
     const bgMusic = document.getElementById('ar-bg-music');
     if(bgMusic) {
-        bgMusic.volume = 0.2; // Low volume for ambience
+        bgMusic.volume = 0.2; 
         bgMusic.play().catch(e => console.log("AR BG Music blocked:", e));
     }
     
-    // 2. Wake up Audio Listener (for Panel Voices)
     if (listener.context.state === 'suspended') {
         listener.context.resume();
     }
 });
 
-// --- LOAD PANEL AUDIO ---
+// --- AUDIO LOAD ---
 const audioLoader = new THREE.AudioLoader();
 const panelAudios = {}; 
 const audioPanels = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11];
@@ -70,15 +70,13 @@ audioPanels.forEach(i => {
     });
 });
 
-// --- ASSETS & PANELS ---
+// --- PANELS ---
 const textureLoader = new THREE.TextureLoader();
-const panelPositions = []; // To store where panels are in the room
+const panelPositions = []; 
 
 function createPanel(index, zPos) {
     const group = new THREE.Group();
-    
-    // --- HEIGHT FIX: 0.8 Meters (Chest Height) ---
-    // X=0 (Center), Y=0.8 (Height), Z=-zPos (Depth)
+    // Height 0.8 is waist/chest level (Comfortable)
     group.position.set(0, 0.8, -zPos); 
 
     const layers = [
@@ -110,12 +108,9 @@ function createPanel(index, zPos) {
     });
     
     scene.add(group);
-    
-    // Save position for proximity logic
     panelPositions.push({ id: index, z: -zPos });
 }
 
-// Generate Panels
 for (let i = 1; i <= TOTAL_PANELS; i++) {
     createPanel(i, i * PANEL_DISTANCE);
 }
@@ -123,7 +118,7 @@ for (let i = 1; i <= TOTAL_PANELS; i++) {
 const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
 scene.add(light);
 
-// --- PROXIMITY LOGIC (Audio & Text) ---
+// --- PROXIMITY LOGIC (TIGHTER ZONES) ---
 const subtitleText = document.getElementById('subtitle-text');
 let currentActivePanel = -1;
 
@@ -135,11 +130,12 @@ function checkProximity() {
     let closestDist = 9999;
 
     panelPositions.forEach(p => {
-        // Calculate distance between user and panel on Z axis
         const dist = Math.abs(camPos.z - p.z);
         
-        // Trigger if within 1.5 meters
-        if (dist < 1.5) {
+        // 2. TRIGGER UPDATE: Reduced from 1.5 to 0.6
+        // Since panels are only 0.8m apart, we need a tight trigger 
+        // so you don't hear Panel 2 while standing at Panel 1.
+        if (dist < 0.6) {
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;
@@ -147,20 +143,16 @@ function checkProximity() {
         }
     });
 
-    // If we entered a NEW panel zone
     if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
         
-        // Stop previous audio
         if (currentActivePanel !== -1 && panelAudios[currentActivePanel] && panelAudios[currentActivePanel].isPlaying) {
             panelAudios[currentActivePanel].stop();
         }
 
-        // Play new audio
         if (panelAudios[closestPanel]) {
             panelAudios[closestPanel].play();
         }
 
-        // Update Text
         const text = STORY_TEXT[closestPanel];
         if (text) {
             subtitleText.innerHTML = text;
@@ -173,8 +165,7 @@ function checkProximity() {
     }
 }
 
-// --- RENDER LOOP ---
 renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
-    checkProximity(); // Check proximity every frame
+    checkProximity(); 
 });
