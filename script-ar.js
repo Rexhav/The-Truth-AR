@@ -3,9 +3,9 @@ import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
-const PANEL_DISTANCE = 2.0; // Panels are 2 meters apart in depth
+const PANEL_DISTANCE = 2.0; // Panels are 2 meters apart deep into the screen
 
-// --- TEXT DATA (Same as Web Version) ---
+// --- TEXT DATA ---
 const STORY_TEXT = {
     1: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br>“I have tried, Indra… but I cannot reach Him.”`,
     2: `<br>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
@@ -26,32 +26,36 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
+renderer.xr.enabled = true; // Enable AR
 document.body.appendChild(renderer.domElement);
 
-// --- AR BUTTON + AUDIO INIT ---
-const arButton = ARButton.createButton(renderer);
+// --- AR BUTTON WITH DOM OVERLAY (CRITICAL FIX) ---
+// This ensures your HTML Subtitles stay visible in AR Mode
+const arButton = ARButton.createButton(renderer, {
+    optionalFeatures: ['dom-overlay'], 
+    domOverlay: { root: document.body } 
+});
 document.body.appendChild(arButton);
 
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
-// Start Audio Context on Click
+// --- START BUTTON LOGIC ---
 arButton.addEventListener('click', () => {
     // 1. Play Background Music
     const bgMusic = document.getElementById('ar-bg-music');
     if(bgMusic) {
-        bgMusic.volume = 0.2;
+        bgMusic.volume = 0.2; // Low volume for ambience
         bgMusic.play().catch(e => console.log("AR BG Music blocked:", e));
     }
     
-    // 2. Wake up Audio Listener for Voiceovers
+    // 2. Wake up Audio Listener (for Panel Voices)
     if (listener.context.state === 'suspended') {
         listener.context.resume();
     }
 });
 
-// --- LOAD NARRATION AUDIO ---
+// --- LOAD PANEL AUDIO ---
 const audioLoader = new THREE.AudioLoader();
 const panelAudios = {}; 
 const audioPanels = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11];
@@ -68,14 +72,14 @@ audioPanels.forEach(i => {
 
 // --- ASSETS & PANELS ---
 const textureLoader = new THREE.TextureLoader();
-// Store panel Z positions to check distances later
-const panelPositions = []; 
+const panelPositions = []; // To store where panels are in the room
 
 function createPanel(index, zPos) {
     const group = new THREE.Group();
     
-    // --- HEIGHT FIX: Changed Y from 1.6 to 1.0 (Lower) ---
-    group.position.set(0, 1.0, -zPos); 
+    // --- HEIGHT FIX: 0.8 Meters (Chest Height) ---
+    // X=0 (Center), Y=0.8 (Height), Z=-zPos (Depth)
+    group.position.set(0, 0.8, -zPos); 
 
     const layers = [
         { suffix: '_bg.png', z: -0.3, scale: 1.5 },
@@ -94,7 +98,7 @@ function createPanel(index, zPos) {
             const mat = new THREE.MeshBasicMaterial({ 
                 map: tex, 
                 transparent: true, 
-                opacity: 0.9, 
+                opacity: 0.95, 
                 side: THREE.DoubleSide 
             });
 
@@ -107,7 +111,7 @@ function createPanel(index, zPos) {
     
     scene.add(group);
     
-    // Save position for logic
+    // Save position for proximity logic
     panelPositions.push({ id: index, z: -zPos });
 }
 
@@ -119,24 +123,22 @@ for (let i = 1; i <= TOTAL_PANELS; i++) {
 const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
 scene.add(light);
 
-// --- PROXIMITY LOGIC ---
+// --- PROXIMITY LOGIC (Audio & Text) ---
 const subtitleText = document.getElementById('subtitle-text');
 let currentActivePanel = -1;
 
 function checkProximity() {
-    // Get Camera Position in World Space
     const camPos = new THREE.Vector3();
     camera.getWorldPosition(camPos);
     
     let closestPanel = -1;
     let closestDist = 9999;
 
-    // Find which panel is closest to the user
     panelPositions.forEach(p => {
-        // We mainly care about Z distance (walking forward/back)
+        // Calculate distance between user and panel on Z axis
         const dist = Math.abs(camPos.z - p.z);
         
-        // "Activation Range" - trigger if within 1.5 meters
+        // Trigger if within 1.5 meters
         if (dist < 1.5) {
             if (dist < closestDist) {
                 closestDist = dist;
@@ -148,17 +150,17 @@ function checkProximity() {
     // If we entered a NEW panel zone
     if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
         
-        // 1. Stop previous audio
+        // Stop previous audio
         if (currentActivePanel !== -1 && panelAudios[currentActivePanel] && panelAudios[currentActivePanel].isPlaying) {
             panelAudios[currentActivePanel].stop();
         }
 
-        // 2. Play new audio
+        // Play new audio
         if (panelAudios[closestPanel]) {
             panelAudios[closestPanel].play();
         }
 
-        // 3. Update Text
+        // Update Text
         const text = STORY_TEXT[closestPanel];
         if (text) {
             subtitleText.innerHTML = text;
@@ -174,5 +176,5 @@ function checkProximity() {
 // --- RENDER LOOP ---
 renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
-    checkProximity(); // Check distance every frame
+    checkProximity(); // Check proximity every frame
 });
