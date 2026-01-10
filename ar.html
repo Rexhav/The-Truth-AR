@@ -4,48 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Hanuman AR</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rozha+One&display=swap" rel="stylesheet">
+
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
         /* Subtitles */
         #subtitle-container {
-            position: absolute;
-            bottom: 15%;
-            width: 90%;
-            left: 5%;
-            text-align: center;
-            pointer-events: none;
-            z-index: 10;
+            position: absolute; bottom: 15%; width: 90%; left: 5%;
+            text-align: center; pointer-events: none; z-index: 10;
         }
         
         #subtitle-text {
-            color: #FFD700;
-            font-size: 1.2rem;
+            color: #FFD700; font-size: 1.2rem;
             text-shadow: 0 0 5px rgba(0,0,0,0.8);
             background: rgba(0, 0, 0, 0.4); 
-            padding: 15px;
-            border-radius: 10px;
-            opacity: 0; 
-            transition: opacity 0.5s ease;
+            padding: 15px; border-radius: 10px;
+            opacity: 0; transition: opacity 0.5s ease;
+            text-rendering: optimizeLegibility;
         }
-        
         #subtitle-text.visible { opacity: 1; }
 
-        /* WARNING INSTRUCTION */
+        /* WARNING (Initial Screen) */
         #ar-warning {
-            position: absolute;
-            top: 20%;
-            width: 100%;
-            text-align: center;
-            color: #FFD700;
-            z-index: 20;
-            pointer-events: none;
-            padding: 0 20px;
-            box-sizing: border-box;
+            position: absolute; top: 20%; width: 100%; text-align: center;
+            color: #FFD700; z-index: 20; pointer-events: none;
         }
-        
         #ar-warning h2 { margin: 0; font-size: 1.5rem; text-transform: uppercase; text-shadow: 0 0 10px #000; }
-        #ar-warning p { font-family: sans-serif; font-size: 0.9rem; color: #fff; opacity: 0.9; text-shadow: 0 0 5px #000; }
+        #ar-warning p { font-family: sans-serif; font-size: 0.9rem; color: #fff; opacity: 0.9; }
+
+        /* 🔥 NEW: GESTURE GUIDE HUD 🔥 */
+        #gesture-guide {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            gap: 20px;
+            z-index: 50;
+            pointer-events: none;
+            opacity: 0; /* Hidden initially */
+            transition: opacity 1s ease;
+        }
+
+        .guide-card {
+            background: rgba(20, 20, 20, 0.8);
+            border: 1px solid #FFD700;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+            min-width: 120px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+        }
+
+        .guide-icon { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+        .guide-text { color: #FFD700; font-family: sans-serif; font-size: 0.8rem; font-weight: bold; }
 
     </style>
 
@@ -65,7 +80,18 @@
 
     <div id="ar-warning">
         <h2>Prepare Your Space</h2>
-        <p>Please start in a clear area where you can take 30-40 steps forward.</p>
+        <p>Please start in a clear area.</p>
+    </div>
+
+    <div id="gesture-guide">
+        <div class="guide-card">
+            <span class="guide-icon">👆</span>
+            <span class="guide-text">DRAG TO<br>ROTATE</span>
+        </div>
+        <div class="guide-card">
+            <span class="guide-icon">🤏</span>
+            <span class="guide-text">PINCH TO<br>MOVE</span>
+        </div>
     </div>
 
     <div id="subtitle-container">

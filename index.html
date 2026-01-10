@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Truth - The Legend of Hanuman</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rozha+One&display=swap" rel="stylesheet">
+    
     <style>
         body {
             margin: 0;
@@ -22,22 +25,25 @@
         h1 { font-size: 3rem; margin-bottom: 10px; letter-spacing: 5px; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
         p { margin-bottom: 50px; color: #aaa; letter-spacing: 2px; }
         
-        .btn-container { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; }
+        /* Container Logic */
+        .container { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; transition: opacity 0.5s; }
+        .hidden { display: none !important; opacity: 0; }
         
         .choice-btn {
             padding: 20px 50px;
             border: 1px solid #FFD700;
             background: rgba(255, 215, 0, 0.05);
             color: #FFD700;
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             cursor: pointer;
             transition: all 0.4s;
-            text-decoration: none;
             font-family: 'Cinzel', serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             min-width: 200px;
+            border-radius: 5px;
+            text-decoration: none;
         }
         
         .choice-btn:hover {
@@ -47,25 +53,88 @@
             transform: translateY(-5px);
         }
 
-        .btn-sub { font-size: 0.7rem; margin-top: 10px; opacity: 0.7; font-family: sans-serif; }
+        .hindi-font { font-family: 'Rozha One', serif; }
+        .btn-sub { font-size: 0.8rem; margin-top: 10px; opacity: 0.7; font-family: sans-serif; letter-spacing: 1px; }
+
+        /* Documentation Link */
+        .docs-link {
+            margin-top: 60px;
+            color: rgba(255, 215, 0, 0.5);
+            text-decoration: none;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            border-bottom: 1px solid transparent;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .docs-link:hover { color: #FFD700; border-bottom: 1px solid #FFD700; }
     </style>
 </head>
 <body>
 
     <h1>THE TRUTH</h1>
-    <p>The Legend of Hanuman</p>
+    <p id="instruction-text">Choose your language / अपनी भाषा चुनें</p>
 
-    <div class="btn-container">
-        <a href="web.html" class="choice-btn">
-            WEB JOURNEY
-            <span class="btn-sub">Cinematic Scroll</span>
-        </a>
+    <div id="lang-selection" class="container">
+        <div class="choice-btn" onclick="selectLanguage('en')">
+            ENGLISH
+            <span class="btn-sub">The Legend</span>
+        </div>
 
-        <a href="ar.html" class="choice-btn">
-            MOBILE AR
-            <span class="btn-sub">Step Into The Story</span>
-        </a>
+        <div class="choice-btn hindi-font" onclick="selectLanguage('hi')">
+            हिंदी
+            <span class="btn-sub">गाथा</span>
+        </div>
     </div>
+
+    <div id="mode-selection" class="container hidden">
+        <div class="choice-btn" onclick="goToMode('web')">
+            SCROLL MODE
+            <span class="btn-sub">Relax & Read</span>
+        </div>
+
+        <div class="choice-btn" onclick="goToMode('ar')">
+            AR MODE
+            <span class="btn-sub">Walk Inside</span>
+        </div>
+    </div>
+
+    <a href="https://rexhav.github.io/TheTruthDocumentation/" target="_blank" class="docs-link">
+        VIEW PROJECT ARCHITECTURE
+    </a>
+
+    <script>
+        let selectedLang = 'en'; // Store user choice
+
+        function selectLanguage(lang) {
+            selectedLang = lang;
+            
+            // 1. Detect Device
+            const isMobile = /iPhone|Android|iPad/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                // If Mobile: Show Mode Selection (Web vs AR)
+                document.getElementById('lang-selection').classList.add('hidden');
+                document.getElementById('mode-selection').classList.remove('hidden');
+                
+                // Update instruction text based on language
+                const instruction = document.getElementById('instruction-text');
+                instruction.innerText = lang === 'hi' 
+                    ? "अनुभव चुनें (Choose Mode)" 
+                    : "Choose Experience Mode";
+                    
+            } else {
+                // If Desktop: Auto-redirect to Web
+                goToMode('web');
+            }
+        }
+
+        function goToMode(mode) {
+            // mode is either 'web' or 'ar'
+            console.log(`Going to ${mode} in ${selectedLang}`);
+            window.location.href = `${mode}.html?lang=${selectedLang}`;
+        }
+    </script>
 
 </body>
 </html>

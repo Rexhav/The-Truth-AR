@@ -1,3 +1,6 @@
+/* --- IMPORTS: Added 'Rozha One' for Hindi & 'Cinzel' for English Headers --- */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Rozha+One&display=swap');
+
 :root {
     --gold: #FFD700;
     --bg-color: #050505;
@@ -7,11 +10,12 @@ body {
     margin: 0;
     overflow: hidden;
     background-color: var(--bg-color);
-    font-family: 'Playfair Display', serif;
+    /* Default body font (English) */
+    font-family: 'Playfair Display', serif; 
     user-select: none;
 }
 
-/* Loading Screen */
+/* --- LOADING SCREEN --- */
 #loading-screen {
     position: fixed;
     top: 0; left: 0;
@@ -42,11 +46,13 @@ body {
     color: var(--gold); font-family: 'Cinzel', serif;
     cursor: pointer; opacity: 0; pointer-events: none;
     transition: all 0.5s ease;
+    font-size: 1rem;
+    letter-spacing: 2px;
 }
 #enter-btn.visible { opacity: 1; pointer-events: auto; }
 #enter-btn:hover { background: var(--gold); color: #000; box-shadow: 0 0 20px var(--gold); }
 
-/* NEW: Scroll Indicator */
+/* --- SCROLL INDICATOR --- */
 #scroll-indicator {
     position: fixed;
     top: 50%; left: 50%;
@@ -68,11 +74,13 @@ body {
     100% { opacity: 0.5; transform: translate(-50%, -50%) translateY(0px); }
 }
 
-/* Subtitles */
+/* --- SUBTITLES --- */
 #subtitle-container {
     position: fixed; bottom: 10%; width: 100%;
     display: flex; flex-direction: column; align-items: center;
     pointer-events: none; z-index: 10;
+    padding: 0 20px; /* Prevent text hitting edges on mobile */
+    box-sizing: border-box;
 }
 
 .sentence-chunk {
@@ -84,6 +92,9 @@ body {
     margin-bottom: 20px;
     opacity: 0; filter: blur(15px); transform: translateY(30px);
     transition: all 1.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    
+    /* Ensure Hindi font renders nicely if JS applies it */
+    text-rendering: optimizeLegibility;
 }
 .sentence-chunk.visible { opacity: 1; filter: blur(0); transform: translateY(0); }
 
@@ -91,6 +102,11 @@ body {
     font-family: 'Cinzel', serif; font-weight: 700; color: var(--gold);
     display: block; margin-bottom: 5px; font-size: 1.2rem;
     text-transform: uppercase; text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
+/* Helper class for Hindi Text (Used dynamically by JS) */
+.hindi-font {
+    font-family: 'Rozha One', serif !important;
 }
 
 canvas { display: block; }

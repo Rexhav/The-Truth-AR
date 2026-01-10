@@ -1,24 +1,59 @@
 import * as THREE from 'three';
 
+// --- 1. LANGUAGE CONFIGURATION (NEW) ---
+const urlParams = new URLSearchParams(window.location.search);
+const currentLang = urlParams.get('lang') || 'en'; // Default to English
+console.log("Web Reality Mode. Language:", currentLang);
+
 // --- CONFIGURATION ---
 const TOTAL_PANELS = 11;
 const PANEL_SPACING = 30; 
 const SCROLL_SPEED = 0.08;
 const SENTENCE_DELAY_MS = 1900; 
 
-// Text Data
-const STORY_TEXT = {
-    1: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br><span class="speaker-name">Yamraj:</span>“I have tried, Indra… but I cannot reach Him.”`,
-    2: `<br><span class="speaker-name">Yamraj</span>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
-    3: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Yamraj:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
-    4: `<span class="speaker-name">Narration:</span>“And so, in divine play, Rama let His ring fall into the depths of the earth…<br>guiding Hanuman toward the truth of time itself.”<br><br><span class="speaker-name">Ram:</span>“Hanuman… my ring has slipped below.<br>Bring it back, dear one.”`,
-    5: ``, 
-    6: `“With folded hands and unquestioning love,<br>Hanuman bowed.”`,
-    7: `<span class="speaker-name">Vasuki:</span>“Welcome, Hanuman… child of the wind.<br>You have crossed realms untraveled by mortals.<br>Tell me… what do you seek in Naag Lok?”<br><br><span class="speaker-name">Hanuman:</span>“I seek my Lord’s ring… the symbol of His faith in me.”<br><br><span class="speaker-name">Vasuki:</span>“A ring you seek… but the truth you will find.”`,
-    8: `“The cycle itself, Hanuman.<br>Rings within rings… stories within stories…”<br><br>“These rings are echoes of time itself.”<br><br>“You have been here before—<br>not once,<br>not twice,<br>but beyond the counting of gods.”`,
-    9: `“Every age repeats. Every story returns.<br>And every time the cycle turns…<br>you come searching for the same ring.”<br><br>“An infinite loop… a divine test.”<br><br>“You are the constant.”<br>“You are the one who returns.”`,
-    10: `“He saw himself across countless lives—<br>kneeling, praying, searching.”<br><br>“The world changes. Time changes.<br>But Hanuman remains.”`,
-    11: `“As Hanuman held the ring, its light trembled…<br>the same light that once shone from Ram’s smile.”<br><br>“He understood:<br>Love like his does not end with lifetimes.”<br><br>“For Ram may leave the world—<br>but He has never once left Hanuman’s heart.”`
+// --- 2. BILINGUAL TEXT DATA (UPDATED) ---
+const STORY_DATA = {
+    1: {
+        en: `After the defeat of Ravana, Ram Rajya blossomed on earth. Peace reigned.<br><br>But the Devtas knew… Vishnu must return to Vaikuntha.<br><span class="speaker-name">Deva:</span>“Yamaraja… the moment has come. Vishnu must return.”<br><span class="speaker-name">Yamraj:</span>“I have tried, Indra… but I cannot reach Him.”`,
+        hi: `रावण वध के बाद, पृथ्वी पर राम राज्य खिल उठा। शांति का वास था।<br><br>परंतु देवता जानते थे... विष्णु को वैकुंठ लौटना होगा।<br><span class="speaker-name">देव:</span>“यमराज... वह क्षण आ गया है। विष्णु को लौटना होगा।”<br><span class="speaker-name">यमराज:</span>“मैंने प्रयास किया इंद्र... पर मैं उन तक पहुँच नहीं पा रहा।”`
+    },
+    2: {
+        en: `<br><span class="speaker-name">Yamraj</span>“Hanuman stands guard over Ram like an unbreakable fortress.<br><br>Even death cannot approach.”<br><br><span class="speaker-name">Narration:</span>“The Devtas knew… destiny was waiting.<br>But the path to fulfill it was blocked by devotion itself.”`,
+        hi: `<br><span class="speaker-name">यमराज:</span>“हनुमान राम के चारों ओर एक अभेद्य किले की तरह खड़े हैं।<br><br>स्वयं मृत्यु भी समीप नहीं आ सकती।”<br><br><span class="speaker-name">कथावाचक:</span>“देवता जानते थे... नियति प्रतीक्षा कर रही थी।<br>परंतु भक्ति ने उसका मार्ग रोक रखा था।”`
+    },
+    3: {
+        en: `<span class="speaker-name">Narration:</span><br>Rama understood the silence behind the heavens… Destiny was calling.<br><br><span class="speaker-name">Yamraj:</span>“Prabhu… forgive me for speaking, but… I cannot perform my duty. Hanuman does not allow even death to come near You.”<br><br><span class="speaker-name">Ram:</span>“Yama… I know. Hanuman’s devotion is boundless. But every leela has its moment… and mine must now unfold.”`,
+        hi: `<span class="speaker-name">कथावाचक:</span><br>राम स्वर्ग के पीछे का मौन समझ गए... नियति पुकार रही थी।<br><br><span class="speaker-name">यमराज:</span>“प्रभु... क्षमा करें, परंतु... मैं अपना कर्तव्य नहीं निभा पा रहा। हनुमान मृत्यु को भी आपके निकट नहीं आने देते।”<br><br><span class="speaker-name">राम:</span>“यम... मैं जानता हूँ। हनुमान की भक्ति अनंत है। पर हर लीला का एक समय होता है... और मेरा समय अब आ गया है।”`
+    },
+    4: {
+        en: `<span class="speaker-name">Narration:</span>“And so, in divine play, Rama let His ring fall into the depths of the earth…<br>guiding Hanuman toward the truth of time itself.”<br><br><span class="speaker-name">Ram:</span>“Hanuman… my ring has slipped below.<br>Bring it back, dear one.”`,
+        hi: `<span class="speaker-name">कथावाचक:</span>“और इस प्रकार, अपनी लीला में, राम ने अपनी अंगूठी पाताल की गहराइयों में गिरा दी...<br>हनुमान को समय के सत्य की ओर ले जाने के लिए।”<br><br><span class="speaker-name">राम:</span>“हनुमान... मेरी अंगूठी नीचे गिर गई है।<br>उसे ले आओ, प्रिय।”`
+    },
+    5: { en: ``, hi: `` }, 
+    6: {
+        en: `“With folded hands and unquestioning love,<br>Hanuman bowed.”`,
+        hi: `“जुड़े हुए हाथों और निस्वार्थ प्रेम के साथ,<br>हनुमान नतमस्तक हुए।”`
+    },
+    7: {
+        en: `<span class="speaker-name">Vasuki:</span>“Welcome, Hanuman… child of the wind.<br>You have crossed realms untraveled by mortals.<br>Tell me… what do you seek in Naag Lok?”<br><br><span class="speaker-name">Hanuman:</span>“I seek my Lord’s ring… the symbol of His faith in me.”<br><br><span class="speaker-name">Vasuki:</span>“A ring you seek… but the truth you will find.”`,
+        hi: `<span class="speaker-name">वासुकी:</span>“स्वागत है, हनुमान... पवन पुत्र।<br>तुमने उन लोकों को पार किया है जहाँ मनुष्य नहीं जा सकते।<br>कहो... नाग लोक में क्या खोज रहे हो?”<br><br><span class="speaker-name">हनुमान:</span>“मैं अपने प्रभु की अंगूठी खोज रहा हूँ... मुझ पर उनके विश्वास का प्रतीक।”<br><br><span class="speaker-name">वासुकी:</span>“तुम अंगूठी खोज रहे हो... पर तुम्हें सत्य मिलेगा।”`
+    },
+    8: {
+        en: `“The cycle itself, Hanuman.<br>Rings within rings… stories within stories…”<br><br>“These rings are echoes of time itself.”<br><br>“You have been here before—<br>not once,<br>not twice,<br>but beyond the counting of gods.”`,
+        hi: `“यह स्वयं कालचक्र है, हनुमान।<br>अंगूठियों के भीतर अंगूठियां... कहानियों के भीतर कहानियां...”<br><br>“ये अंगूठियां समय की प्रतिध्वनि हैं।”<br><br>“तुम यहाँ पहले भी आ चुके हो—<br>एक बार नहीं,<br>दो बार नहीं,<br>बल्कि अनगिनत बार।”`
+    },
+    9: {
+        en: `“Every age repeats. Every story returns.<br>And every time the cycle turns…<br>you come searching for the same ring.”<br><br>“An infinite loop… a divine test.”<br><br>“You are the constant.”<br>“You are the one who returns.”`,
+        hi: `“हर युग दोहराता है। हर कहानी लौटती है।<br>और हर बार जब चक्र घूमता है...<br>तुम उसी अंगूठी की खोज में आते हो।”<br><br>“एक अनंत चक्र... एक दिव्य परीक्षा।”<br><br>“तुम ही स्थिर हो।”<br>“तुम ही हो जो लौटते हो।”`
+    },
+    10: {
+        en: `“He saw himself across countless lives—<br>kneeling, praying, searching.”<br><br>“The world changes. Time changes.<br>But Hanuman remains.”`,
+        hi: `“उन्होंने अपने आप को अनगिनत जन्मों में देखा—<br>प्रार्थना करते हुए, खोजते हुए।”<br><br>“संसार बदलता है। समय बदलता है।<br>परंतु हनुमान वही रहते हैं।”`
+    },
+    11: {
+        en: `“As Hanuman held the ring, its light trembled…<br>the same light that once shone from Ram’s smile.”<br><br>“He understood:<br>Love like his does not end with lifetimes.”<br><br>“For Ram may leave the world—<br>but He has never once left Hanuman’s heart.”`,
+        hi: `“जैसे ही हनुमान ने अंगूठी पकड़ी, उसका प्रकाश कांप उठा...<br>वही प्रकाश जो कभी राम की मुस्कान से चमकता था।”<br><br>“वे समझ गए:<br>उनका प्रेम जीवन के साथ समाप्त नहीं होता।”<br><br>“राम संसार छोड़ सकते हैं—<br>परंतु वे हनुमान के हृदय से कभी नहीं गए।”`
+    }
 };
 
 // --- SCENE SETUP ---
@@ -54,7 +89,9 @@ manager.onProgress = (url, itemsLoaded, itemsTotal) => {
 
 manager.onLoad = () => {
     enterBtn.classList.add('visible');
-    enterBtn.innerHTML = "BEGIN LEGEND";
+    // Change Button Text based on Language
+    enterBtn.innerHTML = currentLang === 'hi' ? "गाथा शुरू करें" : "BEGIN LEGEND";
+    if(currentLang === 'hi') enterBtn.style.fontFamily = "'Rozha One', serif";
 };
 
 // --- PANEL AUDIO (VOICES) ---
@@ -64,14 +101,22 @@ camera.add(listener);
 
 const panelAudios = {}; 
 const audioPanels = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11];
+
+// --- 3. DYNAMIC AUDIO LOADING (UPDATED) ---
 audioPanels.forEach(i => {
     const sound = new THREE.Audio(listener);
-    audioLoader.load(`assets/audio/panel${i}.mp3`, (buffer) => {
+    // Load _en.mp3 or _hi.mp3 based on selection
+    const audioPath = `assets/audio/panel${i}_${currentLang}.mp3`;
+    
+    audioLoader.load(audioPath, (buffer) => {
         sound.setBuffer(buffer);
         sound.setLoop(false);
         sound.setVolume(1.0);
         panelAudios[i] = sound;
-    });
+    }, 
+    undefined, // onProgress
+    (err) => { console.warn(`Audio missing for panel ${i} (${currentLang})`, err); } // Helper for debugging
+    );
 });
 
 // --- PARALLAX PANELS ---
@@ -246,7 +291,22 @@ function animate() {
             panelAudios[activePanelIndex].play();
         }
 
-        const textRaw = STORY_TEXT[activePanelIndex];
+        // --- 4. TEXT & FONT LOGIC (UPDATED) ---
+        // Get text based on current language
+        const textData = STORY_DATA[activePanelIndex];
+        const textRaw = textData ? textData[currentLang] : "";
+
+        // Switch Font if Hindi
+        if (currentLang === 'hi') {
+            subtitleTextContainer.style.fontFamily = "'Rozha One', serif";
+            subtitleTextContainer.style.fontSize = "1.8rem"; // Hindi needs slightly bigger text
+            subtitleTextContainer.style.lineHeight = "1.6";
+        } else {
+            subtitleTextContainer.style.fontFamily = "'Cinzel', serif";
+            subtitleTextContainer.style.fontSize = "1.5rem";
+            subtitleTextContainer.style.lineHeight = "1.4";
+        }
+
         if (textRaw) {
             let chunks = textRaw.split(/<br\s*\/?>/gi);
             chunks = chunks.filter(chunk => chunk.trim() !== "");
