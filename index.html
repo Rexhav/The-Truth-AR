@@ -90,6 +90,24 @@
             opacity: 0.9;
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
+
+        /* 🔥 MOBILE HINT STYLE (DESKTOP ONLY) 🔥 */
+        #mobile-hint {
+            color: #FFD700;
+            font-family: 'Cinzel', serif;
+            font-size: 0.9rem;
+            margin-top: 30px;
+            letter-spacing: 1px;
+            opacity: 0.8;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+            animation: pulse 3s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
     </style>
 </head>
 <body>
@@ -108,6 +126,10 @@
             <span class="btn-sub">गाथा</span>
         </div>
     </div>
+
+    <p id="mobile-hint" class="hidden">
+        For an immersive AR walkthrough, open this site on your mobile.
+    </p>
 
     <div id="mode-selection" class="container hidden">
         <div class="choice-btn" onclick="goToMode('web')">
@@ -132,11 +154,16 @@
     <script>
         let selectedLang = 'en'; // Store user choice
 
+        // 1. Detect Device Immediately
+        const isMobile = /iPhone|Android|iPad/i.test(navigator.userAgent);
+        
+        // 2. If Desktop -> Show the AR Hint
+        if (!isMobile) {
+            document.getElementById('mobile-hint').classList.remove('hidden');
+        }
+
         function selectLanguage(lang) {
             selectedLang = lang;
-            
-            // 1. Detect Device
-            const isMobile = /iPhone|Android|iPad/i.test(navigator.userAgent);
             
             if (isMobile) {
                 // If Mobile: Show Mode Selection (Web vs AR)
@@ -156,7 +183,6 @@
         }
 
         function goToMode(mode) {
-            // mode is either 'web' or 'ar'
             console.log(`Going to ${mode} in ${selectedLang}`);
             window.location.href = `${mode}.html?lang=${selectedLang}`;
         }
