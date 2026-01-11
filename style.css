@@ -110,3 +110,25 @@ body {
 }
 
 canvas { display: block; }
+
+/* --- CREATOR SIGNATURE STYLES --- */
+.creator-credit {
+    position: fixed;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    font-size: 0.75rem;
+    color: rgba(255, 215, 0, 0.4); /* Faded Gold */
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.creator-credit .highlight {
+    color: #FFD700;
+    font-weight: 700;
+    opacity: 0.9;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+}
