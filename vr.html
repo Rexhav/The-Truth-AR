@@ -8,7 +8,6 @@
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
-        /* OVERLAY */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.95); display: flex; flex-direction: column;
@@ -23,30 +22,19 @@
         }
         button:active { transform: scale(0.95); background: #fff; }
         
-        /* DEBUG CONSOLE */
-        #debug-console {
-            position: absolute; top: 0; left: 0; width: 100%; 
-            color: #ff4444; font-family: monospace; font-size: 12px;
-            background: rgba(0,0,0,0.8); pointer-events: none; z-index: 200;
-            padding: 10px; box-sizing: border-box; text-align: left;
-            white-space: pre-wrap;
-        }
-
         #home-btn {
             position: absolute; top: 20px; left: 20px; z-index: 50;
             background: rgba(0,0,0,0.5); padding: 10px; border-radius: 50%;
             border: 1px solid #FFD700; display: flex;
         }
-    </style>
 
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
-            }
+        #debug-console {
+            position: absolute; top: 0; left: 0; width: 100%; 
+            color: #ff4444; font-family: monospace; font-size: 12px;
+            background: rgba(0,0,0,0.8); pointer-events: none; z-index: 200;
+            padding: 10px; box-sizing: border-box; text-align: left;
         }
-    </script>
+    </style>
 </head>
 <body>
 
@@ -60,62 +48,101 @@
         <h1>ENTER THE VOID</h1>
         <p>Put your phone in a VR Headset</p>
         <button id="start-btn">START VR</button>
-        <p id="status-text" style="font-size: 0.8rem; color: #666; margin-top: 20px;">Initializing...</p>
+        <p id="status-text" style="font-size: 0.8rem; color: #666; margin-top: 20px;">System Check...</p>
     </div>
 
     <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
     <script>
-        // 1. Catch Script Errors
+        // Use a simpler scope to avoid module issues
+        (function() {
+            const _zee = new THREE.Vector3( 0, 0, 1 );
+            const _euler = new THREE.Euler();
+            const _q0 = new THREE.Quaternion();
+            const _q1 = new THREE.Quaternion( - Math.sqrt( 0.5 ), 0, 0, Math.sqrt( 0.5 ) );
+
+            class DeviceOrientationControls {
+                constructor( object ) {
+                    this.object = object;
+                    this.object.rotation.reorder( 'YXZ' );
+                    this.enabled = true;
+                    this.deviceOrientation = {};
+                    this.screenOrientation = 0;
+                    this.alphaOffset = 0;
+                    this.connect();
+                }
+
+                connect() {
+                    this.onScreenOrientationChangeEvent = () => { this.screenOrientation = window.orientation || 0; };
+                    this.onDeviceOrientationChangeEvent = ( event ) => { this.deviceOrientation = event; };
+                    this.screenOrientation = window.orientation || 0;
+                    window.addEventListener( 'orientationchange', this.onScreenOrientationChangeEvent );
+                    window.addEventListener( 'deviceorientation', this.onDeviceOrientationChangeEvent );
+                    this.enabled = true;
+                }
+
+                disconnect() {
+                    window.removeEventListener( 'orientationchange', this.onScreenOrientationChangeEvent );
+                    window.removeEventListener( 'deviceorientation', this.onDeviceOrientationChangeEvent );
+                    this.enabled = false;
+                }
+
+                update() {
+                    if ( this.enabled === false ) return;
+                    const device = this.deviceOrientation;
+                    if ( device ) {
+                        const alpha = device.alpha ? THREE.MathUtils.degToRad( device.alpha ) + this.alphaOffset : 0;
+                        const beta = device.beta ? THREE.MathUtils.degToRad( device.beta ) : 0;
+                        const gamma = device.gamma ? THREE.MathUtils.degToRad( device.gamma ) : 0;
+                        const orient = this.screenOrientation ? THREE.MathUtils.degToRad( this.screenOrientation ) : 0;
+                        this.setObjectQuaternion( this.object.quaternion, alpha, beta, gamma, orient );
+                    }
+                }
+
+                setObjectQuaternion( quaternion, alpha, beta, gamma, orient ) {
+                    _euler.set( beta, alpha, - gamma, 'YXZ' );
+                    quaternion.setFromEuler( _euler );
+                    quaternion.multiply( _q1 );
+                    quaternion.multiply( _q0.setFromAxisAngle( _zee, - orient ) );
+                }
+            }
+            // Attach to global THREE object
+            THREE.DeviceOrientationControls = DeviceOrientationControls;
+        })();
+    </script>
+
+    <script>
+        // ERROR TRAP
         window.onerror = function(msg, url, line) {
-            document.getElementById('debug-console').innerHTML += `❌ ERROR: ${msg}\nLine: ${line}\n`;
-            document.getElementById('status-text').innerText = "System Failure. Check log.";
+            document.getElementById('debug-console').innerHTML += `❌ ${msg}\n`;
+            document.getElementById('status-text').innerText = "Script Error";
             document.getElementById('status-text').style.color = "red";
         };
 
-        // 2. Catch Network/Loading Errors (The missing link!)
-        window.addEventListener('error', function(e) {
-            if (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK') {
-                document.getElementById('debug-console').innerHTML += `❌ LOAD FAIL: ${e.target.src || e.target.href}\n`;
-                document.getElementById('status-text').innerText = "Network Error. Cannot load 3D Engine.";
-                document.getElementById('status-text').style.color = "red";
-            }
-        }, true);
-        
-        function log(msg) {
-            console.log(msg);
-            // document.getElementById('debug-console').innerHTML += `ℹ️ ${msg}\n`;
+        // Check if THREE loaded
+        if (typeof THREE === 'undefined') {
+            document.getElementById('status-text').innerText = "FATAL: 3D Engine Blocked by Network.";
+            document.getElementById('status-text').style.color = "red";
+        } else {
+            document.getElementById('status-text').innerText = "System Ready. Press Start.";
+            document.getElementById('status-text').style.color = "#0f0";
         }
-    </script>
 
-    <script type="module">
-        log("Module script started...");
-        
-        import * as THREE from 'three';
-        import { DeviceOrientationControls } from 'three/addons/controls/DeviceOrientationControls.js';
-
-        // ✅ If we get here, imports are working!
-        document.getElementById('status-text').innerText = "System Ready. Press Start.";
-        document.getElementById('status-text').style.color = "#0f0";
-
-        // CONFIG
+        // --- SETUP ---
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
         
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-        
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
-
-        const light = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
-        scene.add(light);
-
-        let controls = null;
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x000000, 1));
 
         // --- LOAD CONTENT ---
         const textureLoader = new THREE.TextureLoader();
@@ -125,23 +152,20 @@
             const group = new THREE.Group();
             group.position.set(0, 0, -zPos);
             
-            const layers = [
-                { suffix: '_bg.png', z: -0.3, scale: 1.5 },
-                { suffix: '_mid.png', z: -0.1, scale: 1.2 },
-                { suffix: '_fg.png', z: 0.1, scale: 1.0 }
-            ];
-
-            layers.forEach(layer => {
-                const path = `assets/panels/panel${index}${layer.suffix}`;
+            ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
+                const zOffsets = [-0.3, -0.1, 0.1];
+                const scales = [1.5, 1.2, 1.0];
+                const path = `assets/panels/panel${index}${suffix}`;
+                
                 textureLoader.load(path, (tex) => {
-                    tex.colorSpace = THREE.SRGBColorSpace;
+                    tex.encoding = THREE.sRGBEncoding; // r128 syntax
                     const aspect = tex.image.width / tex.image.height;
                     const mesh = new THREE.Mesh(
                         new THREE.PlaneGeometry(aspect, 1),
                         new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
                     );
-                    mesh.position.z = layer.z;
-                    mesh.scale.set(layer.scale, layer.scale, 1);
+                    mesh.position.z = zOffsets[i];
+                    mesh.scale.set(scales[i], scales[i], 1);
                     group.add(mesh);
                 });
             });
@@ -150,56 +174,47 @@
 
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- BUTTON LOGIC ---
+        // --- CONTROLS LOGIC ---
+        let controls = null;
         const startBtn = document.getElementById('start-btn');
         
         startBtn.addEventListener('click', async () => {
-            log("Start button clicked...");
-            startBtn.innerText = "Starting...";
-            
             try {
                 const music = document.getElementById('bg-music');
-                if(music) music.play().catch(e => log("Audio play warning: " + e));
+                if(music) music.play().catch(e => console.log(e));
 
                 document.getElementById('overlay').style.display = 'none';
 
-                controls = new DeviceOrientationControls(camera);
+                // Initialize Embedded Controls
+                controls = new THREE.DeviceOrientationControls(camera);
                 
-                // iOS Permissions
+                // iOS Permission Check
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     const response = await DeviceOrientationEvent.requestPermission();
-                    if (response === 'granted') {
-                        controls.connect();
-                    } else {
-                        alert("Permission denied. VR requires orientation.");
-                    }
-                } else {
-                    controls.connect();
+                    if (response !== 'granted') alert("Permission denied. VR requires orientation.");
                 }
-
             } catch(e) {
-                alert("Critical VR Error: " + e.message);
-                document.getElementById('debug-console').innerHTML += `❌ CRASH: ${e.message}`;
+                alert("Error: " + e.message);
             }
         });
 
-        // --- RENDER LOOP ---
+        // --- ANIMATION LOOP ---
         const eyeSep = 0.06;
-        
         function animate() {
             requestAnimationFrame(animate);
             if(controls) controls.update();
-
             worldGroup.position.z += 0.002; 
 
             const w = window.innerWidth, h = window.innerHeight;
             renderer.setScissorTest(true);
 
+            // Left
             renderer.setScissor(0, 0, w/2, h);
             renderer.setViewport(0, 0, w/2, h);
             camera.position.x = -eyeSep/2;
             renderer.render(scene, camera);
 
+            // Right
             renderer.setScissor(w/2, 0, w/2, h);
             renderer.setViewport(w/2, 0, w/2, h);
             camera.position.x = eyeSep/2;
