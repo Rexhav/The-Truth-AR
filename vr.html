@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>The Truth - VR Mode</title>
+    <title>The Truth - Cardboard AR</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rozha+One&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
+        /* THE CAMERA FEED (Background) */
+        #camera-feed {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: -1; transform: scaleX(-1); /* Mirror fix if needed */
+        }
+
+        /* OVERLAY */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); display: flex; flex-direction: column;
+            background: rgba(0,0,0,0.8); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
             text-align: center; color: #FFD700;
         }
@@ -18,147 +25,123 @@
         button {
             padding: 15px 30px; font-size: 1.2rem; background: #FFD700; color: #000;
             border: none; border-radius: 5px; margin-top: 20px; font-family: 'Cinzel', serif;
-            cursor: pointer; transition: transform 0.2s;
-        }
-        button:active { transform: scale(0.95); background: #fff; }
-        
-        #home-btn {
-            position: absolute; top: 20px; left: 20px; z-index: 50;
-            background: rgba(0,0,0,0.5); padding: 10px; border-radius: 50%;
-            border: 1px solid #FFD700; display: flex;
+            cursor: pointer;
         }
 
-        #debug-console {
-            position: absolute; top: 0; left: 0; width: 100%; 
-            color: #ff4444; font-family: monospace; font-size: 12px;
-            background: rgba(0,0,0,0.8); pointer-events: none; z-index: 200;
-            padding: 10px; box-sizing: border-box; text-align: left;
+        /* LANDSCAPE WARNING */
+        #landscape-alert {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 999; color: #FFD700;
+            flex-direction: column; justify-content: center; align-items: center; text-align: center;
         }
+        #landscape-alert svg { width: 60px; height: 60px; fill: #FFD700; animation: rotate 2s infinite; }
+        
+        /* SUBTITLES (Duplicated for Left/Right Eye) */
+        .subtitle-eye {
+            position: absolute; bottom: 20%; width: 45%; text-align: center; pointer-events: none; z-index: 10;
+        }
+        .sub-left { left: 2.5%; }
+        .sub-right { left: 52.5%; }
+        
+        .sub-text {
+            color: #FFD700; font-size: 1rem; background: rgba(0,0,0,0.6); 
+            padding: 10px; border-radius: 10px; opacity: 0; transition: opacity 0.5s;
+            display: inline-block;
+        }
+        .sub-text.visible { opacity: 1; }
+
+        @media (orientation: portrait) {
+            #landscape-alert { display: flex; }
+        }
+        @keyframes rotate { 0% { transform: rotate(0deg); } 25% { transform: rotate(90deg); } 100% { transform: rotate(90deg); } }
     </style>
 </head>
 <body>
 
-    <div id="debug-console"></div>
-
-    <a href="index.html" id="home-btn">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-    </a>
-
-    <div id="overlay">
-        <h1>ENTER THE VOID</h1>
-        <p>Put your phone in a VR Headset</p>
-        <button id="start-btn">START VR</button>
-        <p id="status-text" style="font-size: 0.8rem; color: #666; margin-top: 20px;">System Check...</p>
+    <div id="landscape-alert">
+        <svg viewBox="0 0 24 24"><path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm-2 20h-4v-1h4v1zm3.25-3H6.75V4h10.5v14z"/></svg>
+        <p style="margin-top:20px;">PLEASE ROTATE YOUR PHONE</p>
     </div>
 
-    <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
+    <video id="camera-feed" autoplay playsinline muted></video>
+
+    <div id="overlay">
+        <h1>CARDBOARD AR</h1>
+        <p>1. Allow Camera Access<br>2. Rotate Phone<br>3. Put in Headset</p>
+        <button id="start-btn">START EXPERIENCE</button>
+        <p id="status" style="font-size:0.8rem; color:#888; margin-top:10px;">Waiting...</p>
+    </div>
+
+    <div class="subtitle-eye sub-left"><div class="sub-text" id="sub-L"></div></div>
+    <div class="subtitle-eye sub-right"><div class="sub-text" id="sub-R"></div></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // Use a simpler scope to avoid module issues
-        (function() {
-            const _zee = new THREE.Vector3( 0, 0, 1 );
-            const _euler = new THREE.Euler();
-            const _q0 = new THREE.Quaternion();
-            const _q1 = new THREE.Quaternion( - Math.sqrt( 0.5 ), 0, 0, Math.sqrt( 0.5 ) );
-
-            class DeviceOrientationControls {
-                constructor( object ) {
-                    this.object = object;
-                    this.object.rotation.reorder( 'YXZ' );
-                    this.enabled = true;
-                    this.deviceOrientation = {};
-                    this.screenOrientation = 0;
-                    this.alphaOffset = 0;
-                    this.connect();
-                }
-
-                connect() {
-                    this.onScreenOrientationChangeEvent = () => { this.screenOrientation = window.orientation || 0; };
-                    this.onDeviceOrientationChangeEvent = ( event ) => { this.deviceOrientation = event; };
-                    this.screenOrientation = window.orientation || 0;
-                    window.addEventListener( 'orientationchange', this.onScreenOrientationChangeEvent );
-                    window.addEventListener( 'deviceorientation', this.onDeviceOrientationChangeEvent );
-                    this.enabled = true;
-                }
-
-                disconnect() {
-                    window.removeEventListener( 'orientationchange', this.onScreenOrientationChangeEvent );
-                    window.removeEventListener( 'deviceorientation', this.onDeviceOrientationChangeEvent );
-                    this.enabled = false;
-                }
-
-                update() {
-                    if ( this.enabled === false ) return;
-                    const device = this.deviceOrientation;
-                    if ( device ) {
-                        const alpha = device.alpha ? THREE.MathUtils.degToRad( device.alpha ) + this.alphaOffset : 0;
-                        const beta = device.beta ? THREE.MathUtils.degToRad( device.beta ) : 0;
-                        const gamma = device.gamma ? THREE.MathUtils.degToRad( device.gamma ) : 0;
-                        const orient = this.screenOrientation ? THREE.MathUtils.degToRad( this.screenOrientation ) : 0;
-                        this.setObjectQuaternion( this.object.quaternion, alpha, beta, gamma, orient );
-                    }
-                }
-
-                setObjectQuaternion( quaternion, alpha, beta, gamma, orient ) {
-                    _euler.set( beta, alpha, - gamma, 'YXZ' );
-                    quaternion.setFromEuler( _euler );
-                    quaternion.multiply( _q1 );
-                    quaternion.multiply( _q0.setFromAxisAngle( _zee, - orient ) );
-                }
-            }
-            // Attach to global THREE object
-            THREE.DeviceOrientationControls = DeviceOrientationControls;
-        })();
+        (function(){const _zee=new THREE.Vector3(0,0,1),_euler=new THREE.Euler,_q0=new THREE.Quaternion,_q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));class DeviceOrientationControls{constructor(e){this.object=e,this.object.rotation.reorder("YXZ"),this.enabled=!0,this.deviceOrientation={},this.screenOrientation=0,this.alphaOffset=0,this.connect()}connect(){this.onScreenOrientationChangeEvent=()=>{this.screenOrientation=window.orientation||0},this.onDeviceOrientationChangeEvent=e=>{this.deviceOrientation=e},this.screenOrientation=window.orientation||0,window.addEventListener("orientationchange",this.onScreenOrientationChangeEvent),window.addEventListener("deviceorientation",this.onDeviceOrientationChangeEvent),this.enabled=!0}disconnect(){window.removeEventListener("orientationchange",this.onScreenOrientationChangeEvent),window.removeEventListener("deviceorientation",this.onDeviceOrientationChangeEvent),this.enabled=!1}update(){if(!1===this.enabled)return;const e=this.deviceOrientation;if(e){const t=e.alpha?THREE.MathUtils.degToRad(e.alpha)+this.alphaOffset:0,n=e.beta?THREE.MathUtils.degToRad(e.beta):0,o=e.gamma?THREE.MathUtils.degToRad(e.gamma):0,i=this.screenOrientation?THREE.MathUtils.degToRad(this.screenOrientation):0;this.setObjectQuaternion(this.object.quaternion,t,n,o,i)}}setObjectQuaternion(e,t,n,o,i){_euler.set(n,t,-o,"YXZ"),e.setFromEuler(_euler),e.multiply(_q1),e.multiply(_q0.setFromAxisAngle(_zee,-i))}}THREE.DeviceOrientationControls=DeviceOrientationControls;})();
     </script>
 
     <script>
-        // ERROR TRAP
-        window.onerror = function(msg, url, line) {
-            document.getElementById('debug-console').innerHTML += `❌ ${msg}\n`;
-            document.getElementById('status-text').innerText = "Script Error";
-            document.getElementById('status-text').style.color = "red";
-        };
-
-        // Check if THREE loaded
-        if (typeof THREE === 'undefined') {
-            document.getElementById('status-text').innerText = "FATAL: 3D Engine Blocked by Network.";
-            document.getElementById('status-text').style.color = "red";
-        } else {
-            document.getElementById('status-text').innerText = "System Ready. Press Start.";
-            document.getElementById('status-text').style.color = "#0f0";
-        }
-
-        // --- SETUP ---
+        // CONFIG
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
         
+        // --- STORY DATA ---
+        const STORY_DATA = {
+            1: { en: "After the defeat of Ravana, Ram Rajya blossomed...", hi: "रावण वध के बाद, पृथ्वी पर राम राज्य खिल उठा..." },
+            2: { en: "Hanuman stands guard over Ram...", hi: "हनुमान राम के चारों ओर एक अभेद्य किले..." },
+            3: { en: "Rama understood the silence behind the heavens...", hi: "राम स्वर्ग के पीछे का मौन समझ गए..." },
+            4: { en: "Ram let His ring fall into the depths...", hi: "राम ने अपनी अंगूठी पाताल की गहराइयों में गिरा दी..." },
+            6: { en: "With folded hands, Hanuman bowed.", hi: "जुड़े हुए हाथों से हनुमान नतमस्तक हुए।" },
+            7: { en: "Vasuki: What do you seek in Naag Lok?", hi: "वासुकी: नाग लोक में क्या खोज रहे हो?" },
+            8: { en: "These rings are echoes of time itself.", hi: "ये अंगूठियां समय की प्रतिध्वनि हैं।" },
+            9: { en: "Every age repeats. Every story returns.", hi: "हर युग दोहराता है। हर कहानी लौटती है।" },
+            10: { en: "He saw himself across countless lives.", hi: "उन्होंने अपने आप को अनगिनत जन्मों में देखा।" },
+            11: { en: "Ram never left Hanuman's heart.", hi: "राम हनुमान के हृदय से कभी नहीं गए।" }
+        };
+
+        // SETUP
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // Alpha true for Camera feed
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0); // Transparent background
         document.body.appendChild(renderer.domElement);
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
-        scene.add(new THREE.HemisphereLight(0xffffff, 0x000000, 1));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 1));
 
-        // --- LOAD CONTENT ---
+        // --- AUDIO ---
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+        const audioLoader = new THREE.AudioLoader();
+        const panelAudios = {}; 
+        const audioPanels = [1,2,3,4,6,7,8,9,10,11];
+
+        audioPanels.forEach(i => {
+            const sound = new THREE.Audio(listener);
+            audioLoader.load(`assets/audio/panel${i}_${currentLang}.mp3`, (buffer) => {
+                sound.setBuffer(buffer);
+                panelAudios[i] = sound;
+            });
+        });
+
+        // --- PANELS ---
         const textureLoader = new THREE.TextureLoader();
+        const panelPositions = []; 
         const PANEL_DISTANCE = 1.5;
 
         function createPanel(index, zPos) {
             const group = new THREE.Group();
-            group.position.set(0, 0, -zPos);
+            group.position.set(0, 0, -zPos); 
             
             ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
                 const zOffsets = [-0.3, -0.1, 0.1];
                 const scales = [1.5, 1.2, 1.0];
-                const path = `assets/panels/panel${index}${suffix}`;
-                
-                textureLoader.load(path, (tex) => {
-                    tex.encoding = THREE.sRGBEncoding; // r128 syntax
+                textureLoader.load(`assets/panels/panel${index}${suffix}`, (tex) => {
+                    tex.encoding = THREE.sRGBEncoding;
                     const aspect = tex.image.width / tex.image.height;
                     const mesh = new THREE.Mesh(
                         new THREE.PlaneGeometry(aspect, 1),
@@ -170,41 +153,96 @@
                 });
             });
             worldGroup.add(group);
+            panelPositions.push({ id: index, z: -zPos });
         }
-
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- CONTROLS LOGIC ---
-        let controls = null;
-        const startBtn = document.getElementById('start-btn');
-        
-        startBtn.addEventListener('click', async () => {
+        // --- CAMERA FEED LOGIC ---
+        async function startCamera() {
             try {
-                const music = document.getElementById('bg-music');
-                if(music) music.play().catch(e => console.log(e));
+                const video = document.getElementById('camera-feed');
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' } 
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Camera Access Denied. You will see a black background.");
+            }
+        }
 
-                document.getElementById('overlay').style.display = 'none';
+        // --- START ---
+        let controls = null;
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            document.getElementById('overlay').style.display = 'none';
+            
+            // 1. Start Camera
+            startCamera();
 
-                // Initialize Embedded Controls
-                controls = new THREE.DeviceOrientationControls(camera);
-                
-                // iOS Permission Check
-                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    const response = await DeviceOrientationEvent.requestPermission();
-                    if (response !== 'granted') alert("Permission denied. VR requires orientation.");
-                }
-            } catch(e) {
-                alert("Error: " + e.message);
+            // 2. Init VR Controls
+            controls = new THREE.DeviceOrientationControls(camera);
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try { await DeviceOrientationEvent.requestPermission(); } catch(e){}
             }
         });
 
-        // --- ANIMATION LOOP ---
+        // --- AUDIO LOGIC ---
+        let currentActivePanel = -1;
+        const subL = document.getElementById('sub-L');
+        const subR = document.getElementById('sub-R');
+
+        function checkProximity() {
+            // In "Auto-Walk" VR, the world moves, camera stays at 0,0,0
+            // So we check distance from 0,0,0 to panel world position
+            const camPos = new THREE.Vector3(0,0,0); 
+            let closestPanel = -1;
+            let closestDist = 9999;
+
+            panelPositions.forEach(p => {
+                const panelWorldPos = new THREE.Vector3(0, 0, p.z);
+                panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
+                const dist = camPos.distanceTo(panelWorldPos);
+                
+                if (dist < 1.5) { // Activation distance
+                    if (dist < closestDist) { closestDist = dist; closestPanel = p.id; }
+                }
+            });
+
+            if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
+                // Stop old
+                if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) {
+                    panelAudios[currentActivePanel].stop();
+                }
+                // Play new
+                if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
+
+                // Show Subtitles (Both Eyes)
+                const txt = STORY_DATA[closestPanel] ? STORY_DATA[closestPanel][currentLang] : "";
+                if (txt) {
+                    subL.innerText = txt; subR.innerText = txt;
+                    subL.classList.add('visible'); subR.classList.add('visible');
+                    // Font fix
+                    const font = currentLang === 'hi' ? "'Rozha One', serif" : "'Cinzel', serif";
+                    subL.style.fontFamily = font; subR.style.fontFamily = font;
+                } else {
+                    subL.classList.remove('visible'); subR.classList.remove('visible');
+                }
+                currentActivePanel = closestPanel;
+            }
+        }
+
+        // --- LOOP ---
         const eyeSep = 0.06;
         function animate() {
             requestAnimationFrame(animate);
             if(controls) controls.update();
+
+            // 🔥 AUTO-WALK (The panels move towards you)
             worldGroup.position.z += 0.002; 
 
+            // Check Audio
+            checkProximity();
+
+            // RENDER SPLIT
             const w = window.innerWidth, h = window.innerHeight;
             renderer.setScissorTest(true);
 
