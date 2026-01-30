@@ -24,8 +24,9 @@
             padding: 20px 50px; font-size: 1.5rem; background: #FFD700; 
             color: #000; border: none; border-radius: 5px; font-weight: bold;
             font-family: 'Cinzel', serif; cursor: pointer; text-transform: uppercase;
+            box-shadow: 0 0 20px #FFD700; /* HTML Button Glow */
         }
-        button:disabled { background: #333; color: #555; pointer-events: none; }
+        button:disabled { background: #333; color: #555; pointer-events: none; box-shadow: none; }
 
         /* CURSORS */
         .reticle {
@@ -39,6 +40,7 @@
             background: #FFD700; 
             border-color: #FFD700;
             transform: translate(-50%, -50%) scale(1.5);
+            box-shadow: 0 0 15px #FFD700; /* Reticle Glow */
         }
         
         #reticle-left { left: 25%; } 
@@ -90,8 +92,6 @@
         let currentActivePanel = -1;
         let lookTimer = 0;
         let activeBtn = null;
-        
-        // Interaction Lock (Prevents double clicks)
         let interactionLock = false; 
 
         const interactables = []; 
@@ -163,11 +163,10 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 COCKPIT UI (LOWERED) 🔘 ---
+        // --- 🔘 COCKPIT UI 🔘 ---
         const hudGroup = new THREE.Group();
         scene.add(hudGroup);
         
-        // 🔥 LOWERED: y = -1.6 (Deep Lap Level)
         hudGroup.position.set(0, -1.6, -2.5);
         hudGroup.rotation.x = -0.5; 
 
@@ -176,7 +175,7 @@
         startGroup.position.set(0, -0.5, -2.5);
         startGroup.rotation.x = -0.2;
 
-        // --- 📝 FEEDBACK TEXT (Small, Above Buttons) ---
+        // --- 📝 FEEDBACK TEXT ---
         const fbCanvas = document.createElement('canvas');
         fbCanvas.width = 512; fbCanvas.height = 64;
         const fbCtx = fbCanvas.getContext('2d');
@@ -184,27 +183,35 @@
         const fbMat = new THREE.MeshBasicMaterial({ map: fbTex, transparent: true, depthTest: false }); 
         const fbGeo = new THREE.PlaneGeometry(1.5, 0.2);
         const fbMesh = new THREE.Mesh(fbGeo, fbMat);
-        fbMesh.position.y = 0.6; // Floating above square buttons
+        fbMesh.position.y = 0.6; 
         hudGroup.add(fbMesh);
 
         let feedbackTimer = null;
         function showFeedback(text) {
             fbCtx.clearRect(0,0,512,64);
+            
+            // Glow Effect for Text Box
+            fbCtx.shadowBlur = 20;
+            fbCtx.shadowColor = "#00FF00";
+            
             fbCtx.fillStyle = "rgba(0,0,0,0.8)";
             fbCtx.roundRect(10, 0, 492, 64, 10);
             fbCtx.fill();
-            fbCtx.fillStyle = "#00FF00"; // Bright Green Text
+            
+            fbCtx.shadowBlur = 0; // Reset shadow for text
+            fbCtx.fillStyle = "#00FF00"; 
             fbCtx.font = "bold 30px Arial";
             fbCtx.textAlign = "center";
             fbCtx.textBaseline = "middle";
             fbCtx.fillText(text, 256, 32);
+            
             fbTex.needsUpdate = true;
             fbMesh.visible = true;
 
             if(feedbackTimer) clearTimeout(feedbackTimer);
             feedbackTimer = setTimeout(() => { fbMesh.visible = false; }, 2000);
         }
-        fbMesh.visible = false; // Hidden initially
+        fbMesh.visible = false; 
 
         const buttons = {};
 
@@ -215,7 +222,6 @@
             const tex = new THREE.CanvasTexture(canvas);
             const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }); 
             
-            // 🔥 SQUARE SHAPE (PlaneGeometry is already square)
             const geo = new THREE.PlaneGeometry(0.5, 0.5); 
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
@@ -233,18 +239,27 @@
             const ctx = btn.ctx;
             ctx.clearRect(0,0,256,256);
             
-            // SQUARE BACKGROUND
+            // 🔥 GLOW EFFECT LOGIC
+            if (isHovered) {
+                ctx.shadowBlur = 40;
+                ctx.shadowColor = "#FFFFFF"; // White Glow on Hover
+            } else {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "#FFD700"; // Gold Glow Normal
+            }
+
+            // BACKGROUND
             ctx.fillStyle = isHovered ? "rgba(20, 20, 20, 0.95)" : "rgba(0, 0, 0, 0.9)"; 
             ctx.strokeStyle = isHovered ? "#FFFFFF" : "#FFD700"; 
             ctx.lineWidth = 15;
             
-            // Draw Square with rounded corners
             ctx.beginPath();
-            ctx.roundRect(10, 10, 236, 236, 40);
+            ctx.roundRect(20, 20, 216, 216, 40); // Slightly inset for glow room
             ctx.fill();
             ctx.stroke();
             
-            // Text
+            // TEXT
+            ctx.shadowBlur = 0; // Clean text
             ctx.fillStyle = "#FFD700";
             ctx.font = "bold 50px Arial";
             ctx.textAlign = "center";
@@ -266,7 +281,7 @@
         const center = new THREE.Vector2(0, 0);
 
         function updateGaze(dt) {
-            if (!isVRActive || interactionLock) return; // 🔥 LOCK INTERACTION AFTER CLICK
+            if (!isVRActive || interactionLock) return; 
 
             raycaster.setFromCamera(center, camera);
             const intersects = raycaster.intersectObjects(interactables);
@@ -291,7 +306,6 @@
                     if (lookTimer > triggerTime) { 
                         const type = hit.userData.type;
                         
-                        // 🔥 LOCK TO PREVENT DOUBLE CLICK
                         interactionLock = true;
                         setTimeout(() => { interactionLock = false; activeBtn = null; }, 2000); 
 
@@ -304,20 +318,17 @@
                             showFeedback("JOURNEY STARTED");
                         } 
                         else if (type === "PLAY") {
-                            // TOGGLE LOGIC
                             if(isPlaying) {
                                 isPlaying = false;
                                 showFeedback("PAUSED");
-                                drawButton("PLAY", "PAUSED", true); // Show "PAUSED" on button
-                                buttons["PLAY"].mesh.userData.type = "PLAY"; // Keep ID same
+                                drawButton("PLAY", "PAUSED", true);
+                                buttons["PLAY"].mesh.userData.type = "PLAY";
                             } else {
                                 isPlaying = true;
                                 showFeedback("PLAYING");
                                 drawButton("PLAY", "PLAY", true);
                             }
                         }
-                        // Note: For simplicity, I keep the button ID as "PLAY" but change text
-                        
                         else if (type === "SPEED") {
                             if (speedMultiplier === 1) speedMultiplier = 1.5;
                             else if (speedMultiplier === 1.5) speedMultiplier = 0.5;
@@ -333,7 +344,7 @@
                                 moveDirection = 1; 
                                 isPlaying = false; 
                                 showFeedback("PAUSED");
-                                drawButton("PLAY", "PLAY", false); // Reset
+                                drawButton("PLAY", "PLAY", false); 
                             }, 2000); 
                         }
                         
@@ -420,17 +431,16 @@
             const dt = clock.getDelta();
             if(controls) controls.update();
             
+            // 🔥 DEFAULT SPEED: 0.005
             if (isVRActive && isPlaying && hasStarted) {
-                const baseSpeed = 0.008; 
+                const baseSpeed = 0.005; 
                 worldGroup.position.z += (baseSpeed * speedMultiplier * moveDirection);
             }
             starField.rotation.y += 0.0005;
             
             if (isVRActive) {
-                // LOCK COCKPIT TO BODY (Follows Position, Not Rotation)
                 hudGroup.position.set(camera.position.x, -1.6, camera.position.z - 2.5);
                 startGroup.position.set(camera.position.x, -0.5, camera.position.z - 2.5);
-
                 updateGaze(dt);
                 checkProximity();
             }
