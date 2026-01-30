@@ -8,7 +8,6 @@
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
-        /* OVERLAY */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
@@ -22,7 +21,7 @@
             cursor: pointer;
         }
 
-        /* RETICLE (Cursors) */
+        /* CURSORS (Left/Right Eye) */
         .reticle {
             position: absolute; top: 50%; width: 20px; height: 20px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
@@ -31,11 +30,9 @@
         }
         .reticle.active { background: #FFD700; transform: translate(-50%, -50%) scale(0.5); }
         
-        /* Split Screen Positions */
         #reticle-left { left: 25%; } 
         #reticle-right { left: 75%; }
         
-        /* LANDSCAPE WARNING */
         #landscape-alert {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 999; color: #FFD700;
@@ -56,8 +53,8 @@
     </div>
 
     <div id="overlay">
-        <h1>CARDBOARD AR</h1>
-        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look down to move</p>
+        <h1>VR MODE</h1>
+        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look at buttons on the RIGHT</p>
         <button id="start-btn">START EXPERIENCE</button>
     </div>
 
@@ -67,6 +64,7 @@
     <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 
     <script>
         (function(){const _zee=new THREE.Vector3(0,0,1),_euler=new THREE.Euler,_q0=new THREE.Quaternion,_q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));class DeviceOrientationControls{constructor(e){this.object=e,this.object.rotation.reorder("YXZ"),this.enabled=!0,this.deviceOrientation={},this.screenOrientation=0,this.alphaOffset=0,this.connect()}connect(){this.onScreenOrientationChangeEvent=()=>{this.screenOrientation=window.orientation||0},this.onDeviceOrientationChangeEvent=e=>{this.deviceOrientation=e},this.screenOrientation=window.orientation||0,window.addEventListener("orientationchange",this.onScreenOrientationChangeEvent),window.addEventListener("deviceorientation",this.onDeviceOrientationChangeEvent),this.enabled=!0}disconnect(){window.removeEventListener("orientationchange",this.onScreenOrientationChangeEvent),window.removeEventListener("deviceorientation",this.onDeviceOrientationChangeEvent),this.enabled=!1}update(){if(!1===this.enabled)return;const e=this.deviceOrientation;if(e){const t=e.alpha?THREE.MathUtils.degToRad(e.alpha)+this.alphaOffset:0,n=e.beta?THREE.MathUtils.degToRad(e.beta):0,o=e.gamma?THREE.MathUtils.degToRad(e.gamma):0,i=this.screenOrientation?THREE.MathUtils.degToRad(this.screenOrientation):0;this.setObjectQuaternion(this.object.quaternion,t,n,o,i)}}setObjectQuaternion(e,t,n,o,i){_euler.set(n,t,-o,"YXZ"),e.setFromEuler(_euler),e.multiply(_q1),e.multiply(_q0.setFromAxisAngle(_zee,-i))}}THREE.DeviceOrientationControls=DeviceOrientationControls;})();
@@ -76,37 +74,34 @@
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
         
-        // SETUP
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 500);
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio); // 🔥 SHARP TEXT FIX
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); // 🔥 BRIGHTER
         scene.add(ambientLight);
 
-        // --- 🎥 CAMERA BACKGROUND (THE SKYBOX FIX) ---
+        // --- 🎥 FIX 1: FLAT PLANE CAMERA (NO STRETCH) ---
         const video = document.getElementById('video-source');
         const videoTexture = new THREE.VideoTexture(video);
         videoTexture.minFilter = THREE.LinearFilter;
         videoTexture.magFilter = THREE.LinearFilter;
         
-        // GIANT SPHERE instead of plane = Full Surround Vision
-        const camGeo = new THREE.SphereGeometry(200, 60, 40); 
-        // Invert sphere so we see the inside
-        camGeo.scale(-1, 1, 1); 
-        const camMat = new THREE.MeshBasicMaterial({ map: videoTexture });
+        // Use a Flat Plane instead of Sphere
+        // Scaled to 16:9 aspect ratio to match phone screen
+        const camGeo = new THREE.PlaneGeometry(32, 18); 
+        const camMat = new THREE.MeshBasicMaterial({ map: videoTexture, depthTest: false, depthWrite: false });
         const camMesh = new THREE.Mesh(camGeo, camMat);
-        
-        // Attach to camera so it follows you everywhere
-        camera.add(camMesh);
+        camMesh.position.z = -20; // Far back
+        camera.add(camMesh); // Attached to head
         scene.add(camera);
 
         // --- 3D PANELS ---
@@ -140,51 +135,54 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 HIGH RES CONTROLS ---
+        // --- 🔘 FIX 2: VERTICAL SIDE BUTTONS ---
         const buttonGroup = new THREE.Group();
-        scene.add(buttonGroup); // 🔥 DETACHED FROM CAMERA (Allows you to look at them)
+        camera.add(buttonGroup); 
+        
+        // Move to the RIGHT side (x=1.6) so panels don't cover them
+        buttonGroup.position.set(1.6, 0, -3); 
+        buttonGroup.rotation.y = -0.3; // Angle slightly towards user
 
-        function createButton(name, x, color) {
-            // High Res Canvas
+        function createButton(name, y, color) {
             const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 256; // 🔥 4X RESOLUTION
+            canvas.width = 512; canvas.height = 256;
             const ctx = canvas.getContext('2d');
             
+            // Button Style
             ctx.fillStyle = color;
-            ctx.fillRect(0,0,512,256);
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 512, 256, 40); // Rounded Corners
+            ctx.fill();
+            
+            // Text
             ctx.fillStyle = "black";
-            ctx.font = "bold 80px Arial"; // Bigger Font
+            ctx.font = "bold 80px Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(name, 256, 128);
             
             const tex = new THREE.CanvasTexture(canvas);
             const mat = new THREE.MeshBasicMaterial({ map: tex });
-            const geo = new THREE.PlaneGeometry(0.6, 0.3);
+            const geo = new THREE.PlaneGeometry(0.8, 0.4);
             const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.x = x;
+            mesh.position.y = y;
             mesh.userData = { type: name };
             buttonGroup.add(mesh);
             return mesh;
         }
 
-        createButton("PREV", -0.8, "#FFD700");
-        createButton("RESET", 0, "#FF4444");
-        createButton("NEXT", 0.8, "#00FF00");
+        // Vertical Layout
+        createButton("NEXT", 0.3, "#00FF00");  // Top
+        createButton("RESET", -0.3, "#FF4444"); // Bottom
 
         // --- RAYCASTER ---
         const raycaster = new THREE.Raycaster();
         const center = new THREE.Vector2(0, 0);
         let lookTimer = 0;
         let activeBtn = null;
-        
-        function updateGaze(dt) {
-            // Update buttons to follow camera position (but NOT rotation)
-            // This keeps them at your "chest" level
-            buttonGroup.position.z = camera.position.z - 2; 
-            buttonGroup.position.y = -1.2; // Look down
-            buttonGroup.position.x = camera.position.x; // Stay centered
+        let currentPanelIndex = 0;
 
+        function updateGaze(dt) {
             raycaster.setFromCamera(center, camera);
             const intersects = raycaster.intersectObjects(buttonGroup.children);
 
@@ -200,12 +198,16 @@
                     lookTimer = 0;
                 } else {
                     lookTimer += dt;
-                    if (hit.userData.type === "NEXT") {
-                        worldGroup.position.z += 0.03; 
-                    } else if (hit.userData.type === "PREV") {
-                        worldGroup.position.z -= 0.03;
-                    } else if (hit.userData.type === "RESET") {
-                        if (lookTimer > 1.0) { worldGroup.position.z = 0; lookTimer = 0; }
+                    if (lookTimer > 0.8) { // Fast Trigger (0.8s)
+                        
+                        // 🔥 FIX 3: INSTANT MOVEMENT
+                        if (hit.userData.type === "NEXT") {
+                            moveForward();
+                        } else if (hit.userData.type === "RESET") {
+                            worldGroup.position.z = 0;
+                            currentPanelIndex = 0;
+                        }
+                        lookTimer = 0; // Reset so it doesn't spam
                     }
                 }
             } else {
@@ -214,7 +216,18 @@
             }
         }
 
-        // --- AUDIO & START ---
+        function moveForward() {
+            // Instantly slide to next panel
+            currentPanelIndex++;
+            const targetZ = currentPanelIndex * PANEL_DISTANCE;
+            
+            new TWEEN.Tween(worldGroup.position)
+                .to({ z: targetZ }, 500) // 0.5s Fast Slide
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
+
+        // --- AUDIO ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
         const audioLoader = new THREE.AudioLoader();
@@ -227,26 +240,6 @@
                 sound.setBuffer(buffer);
                 panelAudios[i] = sound;
             });
-        });
-
-        let controls = null;
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'environment', width: {ideal: 1280}, height: {ideal: 720} } 
-                });
-                video.srcObject = stream;
-                video.play();
-            } catch (e) { console.log("Camera failed"); }
-
-            const music = document.getElementById('bg-music');
-            if(music) music.play();
-            document.getElementById('overlay').style.display = 'none';
-
-            controls = new THREE.DeviceOrientationControls(camera);
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try { await DeviceOrientationEvent.requestPermission(); } catch(e){}
-            }
         });
 
         let currentActivePanel = -1;
@@ -273,7 +266,28 @@
             }
         }
 
-        // --- ANIMATION LOOP ---
+        // --- START ---
+        let controls = null;
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: {ideal: 1280}, height: {ideal: 720} } 
+                });
+                video.srcObject = stream;
+                video.play();
+            } catch (e) { console.log("Camera failed"); }
+
+            const music = document.getElementById('bg-music');
+            if(music) music.play();
+            document.getElementById('overlay').style.display = 'none';
+
+            controls = new THREE.DeviceOrientationControls(camera);
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try { await DeviceOrientationEvent.requestPermission(); } catch(e){}
+            }
+        });
+
+        // --- LOOP ---
         const clock = new THREE.Clock();
         const eyeSep = 0.06;
 
@@ -281,6 +295,7 @@
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
             if(controls) controls.update();
+            TWEEN.update();
 
             updateGaze(dt);
             checkProximity();
@@ -288,13 +303,11 @@
             const w = window.innerWidth, h = window.innerHeight;
             renderer.setScissorTest(true);
 
-            // Left
             renderer.setScissor(0, 0, w/2, h);
             renderer.setViewport(0, 0, w/2, h);
             camera.position.x = -eyeSep/2;
             renderer.render(scene, camera);
 
-            // Right
             renderer.setScissor(w/2, 0, w/2, h);
             renderer.setViewport(w/2, 0, w/2, h);
             camera.position.x = eyeSep/2;
