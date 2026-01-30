@@ -35,11 +35,11 @@
             box-shadow: 0 0 4px white;
             transition: all 0.2s;
         }
-        /* Active State: Turns Gold */
+        /* Active State: Turns Gold & Grows */
         .reticle.active { 
             background: #FFD700; 
             border-color: #FFD700;
-            transform: translate(-50%, -50%) scale(1.5);
+            transform: translate(-50%, -50%) scale(2.0);
         }
         
         #reticle-left { left: 25%; } 
@@ -91,6 +91,9 @@
         let currentActivePanel = -1;
         let lookTimer = 0;
         let activeBtn = null;
+        
+        // 🔥 CLICKABLE LIST (Only buttons go here)
+        const interactables = []; 
 
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
@@ -159,22 +162,21 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 COCKPIT UI (SCENE LOCKED) 🔘 ---
+        // --- 🔘 COCKPIT UI (LOWERED & FIXED) 🔘 ---
         const hudGroup = new THREE.Group();
         scene.add(hudGroup);
         
-        // Position: 0.8m Down, 2.5m Forward, Tilted Up
-        // This is the "Lap" position
-        hudGroup.position.set(0, -0.8, -2.5);
-        hudGroup.rotation.x = -0.4; 
+        // 🔥 LOWERED: y = -1.2 (Lap Level) | TILTED: -0.5 (Dashboard)
+        hudGroup.position.set(0, -1.2, -2.5);
+        hudGroup.rotation.x = -0.5; 
 
-        // START BUTTON (Attached to HUD center)
+        // START BUTTON GROUP
         const startGroup = new THREE.Group();
         scene.add(startGroup);
-        startGroup.position.set(0, -0.5, -2.2); // Floating above controls
+        startGroup.position.set(0, -0.5, -2.5);
         startGroup.rotation.x = -0.2;
 
-        // SUBTITLE PLANE
+        // SUBTITLES (NOT CLICKABLE)
         const subCanvas = document.createElement('canvas');
         subCanvas.width = 1024; subCanvas.height = 128;
         const subCtx = subCanvas.getContext('2d');
@@ -183,6 +185,7 @@
         const subGeo = new THREE.PlaneGeometry(2.5, 0.3);
         const subMesh = new THREE.Mesh(subGeo, subMat);
         subMesh.position.y = 0.5; // Above buttons
+        // NOTE: We do NOT add subMesh to 'interactables' array.
         hudGroup.add(subMesh);
 
         function updateSubtitle(text) {
@@ -206,15 +209,20 @@
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
             const tex = new THREE.CanvasTexture(canvas);
-            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }); 
             
-            const geo = new THREE.PlaneGeometry(0.5, 0.5); 
+            // Increased Hitbox Size for easier clicking
+            const geo = new THREE.PlaneGeometry(0.6, 0.6); 
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
             mesh.userData = { type: name };
+            
             parentGroup.add(mesh);
             buttons[name] = { mesh, ctx, tex, canvas };
             drawButton(name, name, false); 
+            
+            // 🔥 ADD TO INTERACTABLES LIST
+            interactables.push(mesh);
             return mesh;
         }
 
@@ -223,9 +231,9 @@
             const ctx = btn.ctx;
             ctx.clearRect(0,0,256,256);
             
-            // Background
+            // Background (Black Glass)
             ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; 
-            ctx.strokeStyle = isHovered ? "#FFFFFF" : "#FFD700"; // White on Hover, Gold Normal
+            ctx.strokeStyle = isHovered ? "#FFFFFF" : "#FFD700"; // White on Hover
             ctx.lineWidth = 15;
             
             ctx.beginPath();
@@ -243,10 +251,10 @@
             btn.tex.needsUpdate = true;
         }
 
-        // Layout: Black & Gold Cockpit
-        createButton("REWIND", -0.7, hudGroup);
+        // Layout: Spread out to avoid overlap
+        createButton("REWIND", -0.8, hudGroup);
         createButton("PLAY", 0, hudGroup);
-        createButton("SPEED", 0.7, hudGroup);
+        createButton("SPEED", 0.8, hudGroup);
 
         const btnStart = createButton("START", 0, startGroup);
         btnStart.scale.set(1.5, 1.5, 1.5);
@@ -259,8 +267,10 @@
             if (!isVRActive) return;
 
             raycaster.setFromCamera(center, camera);
-            const targets = [...hudGroup.children, ...startGroup.children];
-            const intersects = raycaster.intersectObjects(targets);
+            
+            // 🔥 FIXED: ONLY CHECK BUTTONS, NOT TEXT
+            const intersects = raycaster.intersectObjects(interactables);
+            
             const retL = document.getElementById('reticle-left');
             const retR = document.getElementById('reticle-right');
 
@@ -270,18 +280,26 @@
                 retL.classList.add('active'); retR.classList.add('active');
                 
                 if (activeBtn !== hit) { 
-                    // New Target: Highlight it
-                    if(activeBtn) drawButton(activeBtn.userData.type, activeBtn.userData.type, false); // Unhighlight old
+                    if(activeBtn) drawButton(activeBtn.userData.type, activeBtn.userData.type, false);
                     activeBtn = hit; 
-                    drawButton(hit.userData.type, hit.userData.type, true); // Highlight new
+                    drawButton(hit.userData.type, hit.userData.type, true); 
                     lookTimer = 0; 
                 } 
                 else {
                     lookTimer += dt;
-                    const triggerTime = (hit.userData.type === "START") ? 2.5 : 1.2;
+                    const triggerTime = (hit.userData.type === "START") ? 2.5 : 1.5;
+                    
                     if (lookTimer > triggerTime) { 
                         const type = hit.userData.type;
-                        if (type === "START") { hasStarted = true; isPlaying = true; startGroup.visible = false; } 
+                        
+                        // ACTIONS
+                        if (type === "START") { 
+                            hasStarted = true; isPlaying = true; 
+                            startGroup.visible = false; 
+                            // Remove Start button from raycaster
+                            const idx = interactables.indexOf(btnStart);
+                            if(idx > -1) interactables.splice(idx, 1);
+                        } 
                         else if (type === "PLAY" || type === "PAUSE") {
                             isPlaying = !isPlaying;
                             drawButton("PLAY", isPlaying ? "PAUSE" : "PLAY", true);
@@ -296,19 +314,23 @@
                         else if (type === "REWIND") {
                             moveDirection = -1; isPlaying = true;
                             drawButton("REWIND", "<<", true);
-                            setTimeout(() => { moveDirection = 1; isPlaying = false; drawButton("PLAY", "PLAY", false); buttons["PLAY"].mesh.userData.type = "PLAY"; }, 2000); 
+                            setTimeout(() => { 
+                                moveDirection = 1; 
+                                isPlaying = false; 
+                                drawButton("PLAY", "PLAY", false); 
+                                buttons["PLAY"].mesh.userData.type = "PLAY"; 
+                            }, 2000); 
                         }
                         
-                        // Reset
                         lookTimer = 0; 
-                        drawButton(hit.userData.type, hit.userData.type, false); // Flash off
+                        drawButton(hit.userData.type, hit.userData.type, false); 
                         activeBtn = null; 
                     }
                 }
             } else {
                 retL.classList.remove('active'); retR.classList.remove('active');
                 if(activeBtn) {
-                    drawButton(activeBtn.userData.type, activeBtn.userData.type, false); // Unhighlight
+                    drawButton(activeBtn.userData.type, activeBtn.userData.type, false);
                     activeBtn = null; 
                 }
                 lookTimer = 0;
@@ -397,7 +419,8 @@
             
             if (isVRActive) {
                 // BODY LOCK THE COCKPIT
-                hudGroup.position.set(camera.position.x, -0.8, camera.position.z - 2.5);
+                // Lowered to -1.2
+                hudGroup.position.set(camera.position.x, -1.2, camera.position.z - 2.5);
                 startGroup.position.set(camera.position.x, -0.5, camera.position.z - 2.2);
 
                 updateGaze(dt);
