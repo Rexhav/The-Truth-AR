@@ -17,7 +17,7 @@
         }
         
         #countdown-display {
-            font-size: 6rem; font-weight: bold; color: #FFD700; margin-top: 20px; display: none;
+            font-size: 8rem; font-weight: bold; color: #FFD700; display: none;
         }
 
         button {
@@ -27,19 +27,20 @@
         }
         button:disabled { background: #333; color: #555; pointer-events: none; }
 
-        /* CURSORS */
+        /* CURSORS - FIXED (No sizing animation) */
         .reticle {
-            position: absolute; top: 50%; width: 12px; height: 12px;
+            position: absolute; top: 50%; width: 10px; height: 10px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
             transform: translate(-50%, -50%); pointer-events: none;
-            box-shadow: 0 0 5px white;
+            box-shadow: 0 0 4px white;
+            transition: background 0.2s, border-color 0.2s; /* Color only */
         }
+        
+        /* Active State: Just turns GREEN. No size change. */
         .reticle.active { 
-            background: #FFD700; border-color: #FFD700;
-            transform: translate(-50%, -50%) scale(2.5); 
-            transition: transform 1.5s linear; 
+            background: #00FF00; 
+            border-color: #00FF00;
         }
-        .reticle.clicked { transform: translate(-50%, -50%) scale(1.0); transition: 0.1s; }
         
         #reticle-left { left: 25%; } 
         #reticle-right { left: 75%; }
@@ -49,25 +50,20 @@
             background: #000; z-index: 999; color: #FFD700;
             flex-direction: column; justify-content: center; align-items: center; text-align: center;
         }
-        #landscape-alert svg { width: 60px; height: 60px; fill: #FFD700; animation: rotate 2s infinite; }
         @media (orientation: portrait) { #landscape-alert { display: flex; } }
-        @keyframes rotate { 0% { transform: rotate(0deg); } 25% { transform: rotate(90deg); } 100% { transform: rotate(90deg); } }
     </style>
 </head>
 <body>
 
-    <div id="landscape-alert">
-        <svg viewBox="0 0 24 24"><path d="M16 1H8C6.34 1 5 2.34 5 4v16c0 1.66 1.34 3 3 3h8c1.66 0 3-1.34 3-3V4c0-1.66-1.34-3-3-3zm-2 20h-4v-1h4v1zm3.25-3H6.75V4h10.5v14z"/></svg>
-        <p style="margin-top:20px;">PLEASE ROTATE PHONE</p>
-    </div>
+    <div id="landscape-alert">PLEASE ROTATE PHONE</div>
 
     <div id="overlay">
         <h1>VR CINEMA MODE</h1>
         <div id="instruction-block">
-            <p style="color:#ccc; line-height:1.6; font-size: 1rem;">
-                1. Press Button.<br>
+            <p style="color:#ccc; line-height:1.6; font-size: 1rem; margin-bottom: 30px;">
+                1. Press Button below.<br>
                 2. Put phone in headset <strong>(10s Timer)</strong>.<br>
-                3. <strong>Stare at GREEN BUTTON</strong> to start.
+                3. <strong>Look down</strong> to see controls.
             </p>
             <button id="start-btn">START TIMER</button>
         </div>
@@ -86,6 +82,17 @@
     </script>
 
     <script>
+        // --- 1. GLOBAL VARIABLES (Fixed Scope Error) ---
+        let controls = null;
+        let isVRActive = false; 
+        let isPlaying = false; 
+        let hasStarted = false;
+        let speedMultiplier = 1; 
+        let moveDirection = 1; 
+        let currentActivePanel = -1;
+        let lookTimer = 0;
+        let activeBtn = null;
+
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
         
@@ -102,19 +109,18 @@
             11: { en: "Ram never left Hanuman's heart.", hi: "राम हनुमान के हृदय से कभी नहीं गए।" }
         };
 
-        // --- SETUP ---
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x000000, 0.02); 
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 500);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
-        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); // Bright light
+        
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); 
         scene.add(ambientLight);
 
         // PARTICLES
@@ -140,7 +146,6 @@
                 const scales = [5.5, 4.5, 3.5]; 
                 const path = `assets/panels/panel${index}${suffix}`;
                 textureLoader.load(path, (tex) => {
-                    tex.encoding = THREE.sRGBEncoding;
                     const aspect = tex.image.width / tex.image.height;
                     const mesh = new THREE.Mesh(
                         new THREE.PlaneGeometry(aspect, 1),
@@ -156,36 +161,28 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 VISIBLE HUD (MOVED UP & CLOSE) 🔘 ---
+        // --- 🔘 SCENE-LOCKED BUTTONS (WILL NOT MOVE WITH HEAD) 🔘 ---
         const hudGroup = new THREE.Group();
-        camera.add(hudGroup);
+        scene.add(hudGroup); // Attached to SCENE
         
-        // 🔥 CRITICAL FIX: HIGHER (y=-0.25) and CLOSER (z=-2.0)
-        hudGroup.position.set(0, -0.25, -2.0); 
-        hudGroup.rotation.x = -0.15; // Very slight tilt
+        // Position: 0.7m Down, 2.5m Forward (Easy to look at)
+        hudGroup.position.set(0, -0.7, -2.5);
+        hudGroup.rotation.x = -0.3; // Tilted slightly up
 
-        // BACKGROUND BAR FOR BUTTONS (Visibility Aid)
-        const barGeo = new THREE.PlaneGeometry(2.5, 0.5);
-        const barMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.7, transparent: true });
-        const barMesh = new THREE.Mesh(barGeo, barMat);
-        barMesh.position.z = -0.05; // Behind buttons
-        hudGroup.add(barMesh);
-
-        // START BUTTON (Dead Center)
+        // START BUTTON
         const startGroup = new THREE.Group();
-        camera.add(startGroup);
-        startGroup.position.set(0, 0, -2.0); // Directly in front of face
+        scene.add(startGroup);
+        startGroup.position.set(0, 0, -2.5); // Floating right in front
 
         // SUBTITLES
         const subCanvas = document.createElement('canvas');
         subCanvas.width = 1024; subCanvas.height = 128;
         const subCtx = subCanvas.getContext('2d');
         const subTex = new THREE.CanvasTexture(subCanvas);
-        const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true });
+        const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true, depthTest: false }); // Always visible
         const subGeo = new THREE.PlaneGeometry(2.5, 0.3);
         const subMesh = new THREE.Mesh(subGeo, subMat);
-        subMesh.position.y = -0.4; // Attached to HUD
-        subMesh.position.z = 0.1;
+        subMesh.position.y = -0.6;
         hudGroup.add(subMesh);
 
         function updateSubtitle(text) {
@@ -209,10 +206,9 @@
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
             const tex = new THREE.CanvasTexture(canvas);
-            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }); // Force on top
             
-            // 🔥 BIGGER BUTTONS (0.4 size at 2m distance)
-            const geo = new THREE.PlaneGeometry(0.4, 0.4);
+            const geo = new THREE.PlaneGeometry(0.5, 0.5); 
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
             mesh.userData = { type: name };
@@ -228,7 +224,7 @@
             ctx.clearRect(0,0,256,256);
             ctx.fillStyle = "rgba(0,0,0,0.9)"; 
             ctx.strokeStyle = btn.color;
-            ctx.lineWidth = 20; // Thicker border
+            ctx.lineWidth = 20;
             ctx.beginPath();
             ctx.arc(128, 128, 110, 0, Math.PI*2);
             ctx.fill();
@@ -241,28 +237,19 @@
             btn.tex.needsUpdate = true;
         }
 
-        createButton("REWIND", -0.6, "#FFFFFF", hudGroup);
+        // Dashboard Buttons
+        createButton("REWIND", -0.7, "#FFFFFF", hudGroup);
         createButton("PLAY", 0, "#FFD700", hudGroup);
-        createButton("SPEED", 0.6, "#00FF00", hudGroup);
+        createButton("SPEED", 0.7, "#00FF00", hudGroup);
 
         const btnStart = createButton("START", 0, "#00FF00", startGroup);
-        btnStart.scale.set(2.0, 2.0, 2.0); // HUGE CENTER BUTTON
+        btnStart.scale.set(2.0, 2.0, 2.0);
 
-        // LOGIC
+        // --- GAZE LOGIC ---
         const raycaster = new THREE.Raycaster();
         const center = new THREE.Vector2(0, 0);
-        let lookTimer = 0;
-        let activeBtn = null;
-        
-        // 🔥 SAFETY FLAGS
-        let isVRActive = false; // Must wait for timer
-        let isPlaying = false; 
-        let hasStarted = false;
-        let speedMultiplier = 1; 
-        let moveDirection = 1; 
 
         function updateGaze(dt) {
-            // CRITICAL SAFETY: Do not process gaze if VR isn't active
             if (!isVRActive) return;
 
             raycaster.setFromCamera(center, camera);
@@ -273,12 +260,14 @@
 
             if (intersects.length > 0 && intersects[0].object.visible) {
                 const hit = intersects[0].object;
+                
+                // Color Change Only (No Sizing)
                 retL.classList.add('active'); retR.classList.add('active');
                 
                 if (activeBtn !== hit) { activeBtn = hit; lookTimer = 0; } 
                 else {
                     lookTimer += dt;
-                    const triggerTime = (hit.userData.type === "START") ? 2.0 : 1.2;
+                    const triggerTime = (hit.userData.type === "START") ? 2.5 : 1.2;
                     if (lookTimer > triggerTime) { 
                         const type = hit.userData.type;
                         if (type === "START") { hasStarted = true; isPlaying = true; startGroup.visible = false; } 
@@ -298,7 +287,9 @@
                             drawButton("REWIND", "<<");
                             setTimeout(() => { moveDirection = 1; isPlaying = false; drawButton("PLAY", "PLAY"); buttons["PLAY"].mesh.userData.type = "PLAY"; }, 2000); 
                         }
-                        retL.classList.remove('active'); retR.classList.remove('active');
+                        // Visual Blink
+                        retL.style.opacity = 0; retR.style.opacity = 0;
+                        setTimeout(() => { retL.style.opacity = 1; retR.style.opacity = 1; }, 200);
                         lookTimer = 0; 
                     }
                 }
@@ -321,7 +312,7 @@
             });
         });
 
-        // START DOM LOGIC
+        // DOM LOGIC
         const startBtnDOM = document.getElementById('start-btn');
         const overlay = document.getElementById('overlay');
         const instructions = document.getElementById('instruction-block');
@@ -331,7 +322,6 @@
             const music = document.getElementById('bg-music');
             if(music) music.play();
 
-            // UI Switch
             instructions.style.display = 'none';
             countdownDisplay.style.display = 'block';
 
@@ -345,10 +335,11 @@
                     overlay.style.opacity = '0';
                     setTimeout(() => { 
                         overlay.style.display = 'none'; 
+                        isVRActive = true; // Unlock Gaze
                         
-                        // 🔥 ACTIVATE VR LOGIC NOW
-                        isVRActive = true; 
+                        // Assign to GLOBAL variable (No 'let')
                         controls = new THREE.DeviceOrientationControls(camera);
+                        
                         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                             try { DeviceOrientationEvent.requestPermission(); } catch(e){}
                         }
@@ -357,9 +348,8 @@
             }, 1000);
         });
 
-        let currentActivePanel = -1;
         function checkProximity() {
-            if (!isVRActive) return; // Don't check proximity if not started
+            if (!isVRActive) return;
             
             const camPos = new THREE.Vector3(0,0,0);
             let closestPanel = -1; let closestDist = 9999;
@@ -380,16 +370,15 @@
 
         const clock = new THREE.Clock();
         const eyeSep = 0.06;
-        let controls = null;
 
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
             if(controls) controls.update();
             
-            // 🔥 MOVEMENT
+            // 🔥 SPEED TUNED (0.008)
             if (isVRActive && isPlaying && hasStarted) {
-                const baseSpeed = 0.004; 
+                const baseSpeed = 0.008; 
                 worldGroup.position.z += (baseSpeed * speedMultiplier * moveDirection);
             }
             starField.rotation.y += 0.0005;
