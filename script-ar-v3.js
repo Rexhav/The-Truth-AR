@@ -10,6 +10,10 @@ console.log("AR Reality Mode. Language:", currentLang);
 const TOTAL_PANELS = 11;
 const PANEL_DISTANCE = 1.35; 
 
+// --- VR STATE ---
+let isVR = false;
+const eyeSeparation = 0.06; // 6cm (Standard human IPD)
+
 // --- 2. BILINGUAL TEXT DATA ---
 const STORY_DATA = {
     1: {
@@ -64,7 +68,7 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// --- AR BUTTON ---
+// --- AR BUTTON (Standard WebXR Button) ---
 const arButton = ARButton.createButton(renderer, {
     optionalFeatures: ['dom-overlay'], 
     domOverlay: { root: document.body } 
@@ -144,7 +148,54 @@ for (let i = 1; i <= TOTAL_PANELS; i++) {
 const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
 scene.add(light);
 
-// --- START LOGIC (UPDATED WITH GUIDE) ---
+
+// --- VR BUTTON LOGIC ---
+const vrBtn = document.getElementById('vr-btn');
+if (vrBtn) {
+    vrBtn.addEventListener('click', () => {
+        isVR = !isVR;
+        const warning = document.getElementById('ar-warning');
+        
+        if (isVR) {
+            vrBtn.style.background = "#FFD700";
+            vrBtn.style.color = "#000";
+            vrBtn.innerHTML = "EXIT VR";
+            
+            // For VR, we prefer a black background to block real world distractions
+            document.body.style.background = "#000";
+            if(renderer.domElement) renderer.domElement.style.background = "#000";
+
+            // Hide UI
+            if(warning) warning.style.display = 'none';
+
+        } else {
+            vrBtn.style.background = "rgba(0,0,0,0.6)";
+            vrBtn.style.color = "#FFD700";
+            vrBtn.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 6H9v-2h2v2zm4 0h-2v-2h2v2z"/></svg> VR MODE`;
+
+            // Back to AR (Transparent)
+            document.body.style.background = "transparent";
+            if(renderer.domElement) renderer.domElement.style.background = "transparent";
+            
+            // Reset Camera
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+        }
+        
+        onWindowResize(); // Force resize to clean up
+    });
+}
+
+// Handle Resize
+window.addEventListener('resize', onWindowResize, false);
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+
+// --- START LOGIC (AR SESSION) ---
 arButton.addEventListener('click', () => {
     // 1. Hide warning
     const warning = document.getElementById('ar-warning');
@@ -162,18 +213,11 @@ arButton.addEventListener('click', () => {
         listener.context.resume();
     }
 
-    // 🔥 4. SHOW GESTURE GUIDE 🔥
+    // 4. SHOW GESTURE GUIDE
     const guide = document.getElementById('gesture-guide');
     if(guide) {
-        // Show immediately (small delay for AR session init)
-        setTimeout(() => {
-            guide.style.opacity = '1';
-        }, 1000);
-
-        // Hide after 6 seconds (enough time to read)
-        setTimeout(() => {
-            guide.style.opacity = '0';
-        }, 7000);
+        setTimeout(() => { guide.style.opacity = '1'; }, 1000);
+        setTimeout(() => { guide.style.opacity = '0'; }, 7000);
     }
 });
 
@@ -183,13 +227,11 @@ let touchStartX = 0;
 let isDragging = false;
 let initialDistance = 0;
 
-// We use the DOM overlay for touch events
 document.body.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
         isDragging = true;
         touchStartX = e.touches[0].clientX;
     } else if (e.touches.length === 2) {
-        // Pinch start
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         initialDistance = Math.sqrt(dx * dx + dy * dy);
@@ -198,22 +240,16 @@ document.body.addEventListener('touchstart', (e) => {
 
 document.body.addEventListener('touchmove', (e) => {
     if (e.touches.length === 1 && isDragging) {
-        // ROTATE WORLD
         const deltaX = e.touches[0].clientX - touchStartX;
-        worldGroup.rotation.y -= deltaX * 0.005; // Adjust sensitivity
+        worldGroup.rotation.y -= deltaX * 0.005; 
         touchStartX = e.touches[0].clientX;
     } else if (e.touches.length === 2) {
-        // MOVE WORLD (Z-AXIS)
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const currentDistance = Math.sqrt(dx * dx + dy * dy);
-        
         const delta = currentDistance - initialDistance;
         
-        // If spreading fingers (positive delta), pull world closer
-        // If pinching (negative delta), push world away
         worldGroup.position.z += delta * 0.01; 
-        
         initialDistance = currentDistance;
     }
 });
@@ -223,7 +259,7 @@ document.body.addEventListener('touchend', () => {
 });
 
 
-// --- PROXIMITY LOGIC (UPDATED FOR WORLD MOVEMENT) ---
+// --- PROXIMITY LOGIC ---
 const subtitleText = document.getElementById('subtitle-text');
 let currentActivePanel = -1;
 
@@ -235,14 +271,12 @@ function checkProximity() {
     let closestDist = 9999;
 
     panelPositions.forEach(p => {
-        // We must calculate the WORLD position of each panel now
-        // because the 'worldGroup' might have moved or rotated.
         const panelWorldPos = new THREE.Vector3(0, 0, p.z);
         panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
 
         const dist = camPos.distanceTo(panelWorldPos);
         
-        if (dist < 1.2) { // Slightly increased trigger distance
+        if (dist < 1.2) { 
             if (dist < closestDist) {
                 closestDist = dist;
                 closestPanel = p.id;
@@ -251,7 +285,6 @@ function checkProximity() {
     });
 
     if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
-        
         if (currentActivePanel !== -1 && panelAudios[currentActivePanel] && panelAudios[currentActivePanel].isPlaying) {
             panelAudios[currentActivePanel].stop();
         }
@@ -284,7 +317,40 @@ function checkProximity() {
     }
 }
 
+
+// --- MAIN RENDER LOOP (WITH VR SUPPORT) ---
 renderer.setAnimationLoop(() => {
-    renderer.render(scene, camera);
-    checkProximity(); 
+    
+    // Check Logic (Audio/Distance)
+    checkProximity();
+
+    if (isVR) {
+        // --- VR SPLIT SCREEN MODE ---
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        renderer.setScissorTest(true);
+
+        // 1. LEFT EYE
+        renderer.setScissor(0, 0, width / 2, height);
+        renderer.setViewport(0, 0, width / 2, height);
+        
+        camera.position.x -= eyeSeparation / 2; // Move cam left
+        renderer.render(scene, camera);
+        camera.position.x += eyeSeparation / 2; // Reset
+
+        // 2. RIGHT EYE
+        renderer.setScissor(width / 2, 0, width / 2, height);
+        renderer.setViewport(width / 2, 0, width / 2, height);
+        
+        camera.position.x += eyeSeparation / 2; // Move cam right
+        renderer.render(scene, camera);
+        camera.position.x -= eyeSeparation / 2; // Reset
+
+    } else {
+        // --- STANDARD AR MODE ---
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+        renderer.render(scene, camera);
+    }
 });

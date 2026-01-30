@@ -11,12 +11,35 @@
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
+        /* --- HOME BUTTON --- */
+        #home-btn {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0, 0, 0, 0.6); padding: 10px;
+            border-radius: 50%; border: 1px solid rgba(255, 215, 0, 0.3);
+            z-index: 100; display: flex; justify-content: center; align-items: center;
+            transition: all 0.3s;
+        }
+        #home-btn:hover { background: #FFD700; transform: scale(1.1); }
+        #home-btn svg { stroke: #FFD700; }
+        #home-btn:hover svg { stroke: #000; }
+
+        /* --- VR BUTTON --- */
+        #vr-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #FFD700; color: #FFD700;
+            padding: 10px 15px; border-radius: 20px;
+            cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold;
+            z-index: 100; display: flex; align-items: center; gap: 10px;
+            backdrop-filter: blur(5px); transition: all 0.3s ease;
+        }
+        #vr-btn:hover { background: #FFD700; color: #000; box-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
+        
         /* Subtitles */
         #subtitle-container {
             position: absolute; bottom: 15%; width: 90%; left: 5%;
             text-align: center; pointer-events: none; z-index: 10;
         }
-        
         #subtitle-text {
             color: #FFD700; font-size: 1.2rem;
             text-shadow: 0 0 5px rgba(0,0,0,0.8);
@@ -27,7 +50,7 @@
         }
         #subtitle-text.visible { opacity: 1; }
 
-        /* WARNING (Initial Screen) - Updated for Walking Emphasis */
+        /* WARNING (Initial Screen) */
         #ar-warning {
             position: absolute; top: 20%; width: 100%; text-align: center;
             color: #FFD700; z-index: 20; pointer-events: none;
@@ -42,45 +65,50 @@
 
         /* GESTURE GUIDE HUD */
         #gesture-guide {
-            position: absolute;
-            top: 50%; left: 50%;
+            position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            display: flex;
-            gap: 15px;
-            z-index: 50;
-            pointer-events: none;
-            opacity: 0; /* Hidden initially */
-            transition: opacity 1s ease;
-            width: 90%;
-            justify-content: center;
+            display: flex; gap: 15px; z-index: 50;
+            pointer-events: none; opacity: 0; transition: opacity 1s ease;
+            width: 90%; justify-content: center;
         }
-
         .guide-card {
             background: rgba(10, 10, 10, 0.85);
             border: 1px solid rgba(255, 215, 0, 0.3);
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            backdrop-filter: blur(5px);
-            width: 140px;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
+            padding: 15px; border-radius: 8px;
+            text-align: center; backdrop-filter: blur(5px);
+            width: 140px; box-shadow: 0 0 15px rgba(255, 215, 0, 0.1);
         }
-
-        /* Vector Icon Styling */
         .guide-icon svg {
-            width: 40px;
-            height: 40px;
-            fill: none;
-            stroke: #FFD700;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
-            margin-bottom: 10px;
-            filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));
+            width: 40px; height: 40px; fill: none; stroke: #FFD700;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+            margin-bottom: 10px; filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));
         }
-
         .guide-title { color: #FFD700; font-size: 0.9rem; margin-bottom: 5px; letter-spacing: 1px; }
         .guide-desc { color: #aaa; font-family: sans-serif; font-size: 0.7rem; line-height: 1.2; }
+
+        /* --- 🍎 iOS WARNING POPUP --- */
+        #ios-alert {
+            display: none; /* Hidden by default */
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 999;
+            flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; padding: 30px; box-sizing: border-box;
+        }
+        #ios-alert h2 { color: #FFD700; font-size: 1.5rem; margin-bottom: 15px; }
+        #ios-alert p { color: #ccc; font-family: sans-serif; line-height: 1.6; margin-bottom: 30px; font-size: 0.9rem; }
+        
+        .ios-btn {
+            background: #FFD700; color: #000;
+            padding: 15px 30px; text-decoration: none;
+            border-radius: 5px; font-weight: bold; font-family: sans-serif;
+            margin-bottom: 15px; display: inline-block;
+        }
+        .ios-sub-btn {
+            background: transparent; border: 1px solid #555;
+            color: #777; padding: 10px 20px; border-radius: 5px;
+            font-size: 0.8rem; cursor: pointer;
+        }
 
     </style>
 
@@ -98,6 +126,33 @@
         <source src="assets/audio/bgmusic.mp3" type="audio/mpeg">
     </audio>
 
+    <a href="index.html" id="home-btn">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD700" stroke-width="2">
+            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+        </svg>
+    </a>
+
+    <button id="vr-btn">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 6H9v-2h2v2zm4 0h-2v-2h2v2z"/>
+        </svg>
+        VR MODE
+    </button>
+
+    <div id="ios-alert">
+        <h2>⚠️ iOS Device Detected</h2>
+        <p>Apple restricts AR on the web (Safari).<br>
+        To experience this, please download the <strong style="color:#fff">WebXR Viewer</strong> app.</p>
+        
+        <a href="https://apps.apple.com/us/app/webxr-viewer/id1295998056" class="ios-btn">
+            Download WebXR Viewer 
+        </a>
+        
+        <button class="ios-sub-btn" onclick="document.getElementById('ios-alert').style.display='none'">
+            I already have it / Continue Anyway
+        </button>
+    </div>
+
     <div id="ar-warning">
         <h2>Walk Into The Legend</h2>
         <p>This is a physical journey.<br>
@@ -110,8 +165,10 @@
             <div class="guide-icon">
                 <svg viewBox="0 0 24 24">
                     <path d="M12 2a10 10 0 1 0 10 10"></path>
-                    <path d="M8 12l4 4 4-4"></path> <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2" stroke-opacity="0.2"></path>
-                    <path d="M14 10l-2 9" stroke-width="1.5"></path> </svg>
+                    <path d="M8 12l4 4 4-4"></path>
+                    <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2" stroke-opacity="0.2"></path>
+                    <path d="M14 10l-2 9" stroke-width="1.5"></path>
+                </svg>
             </div>
             <div class="guide-title">BLOCKED?</div>
             <div class="guide-desc">Drag 1 finger to rotate the path away from walls.</div>
@@ -135,6 +192,19 @@
     <div id="subtitle-container">
         <div id="subtitle-text"></div>
     </div>
+
+    <script>
+        // Simple check for iPhone/iPad/iPod
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
+        // Also check if they are NOT in the WebXR Viewer (which identifies itself differently)
+        // If it's standard Safari, show the alert.
+        const isWebXRViewer = navigator.userAgent.includes('WebXRViewer');
+
+        if (isIOS && !isWebXRViewer) {
+            document.getElementById('ios-alert').style.display = 'flex';
+        }
+    </script>
 
     <script type="module" src="script-ar-v3.js?v=999"></script>
 </body>

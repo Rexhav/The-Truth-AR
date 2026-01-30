@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Truth - The Legend of Hanuman</title>
     
+    <meta property="og:title" content="The Truth: A Hanuman AR Experience">
+    <meta property="og:description" content="Walk into the legend. A bilingual immersive journey into the Ramayana using WebAR. Designed by Raghav Sharma.">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rozha+One&display=swap" rel="stylesheet">
     
@@ -21,11 +24,73 @@
             color: #FFD700;
             text-align: center;
             background-image: radial-gradient(circle at center, #1a1500 0%, #000000 70%);
+            overflow: hidden; /* Prevent scrolling during intro */
         }
+
+        /* --- CINEMATIC INTRO OVERLAY --- */
+        #intro-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #000;
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 1.5s ease-out;
+        }
+
+        #intro-video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0; /* Hidden until played */
+            transition: opacity 0.8s;
+        }
+
+        #intro-content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            transition: opacity 0.5s;
+        }
+
+        .intro-title {
+            font-size: 3rem;
+            letter-spacing: 5px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            animation: glow 3s infinite alternate;
+        }
+
+        #enter-experience-btn {
+            padding: 15px 40px;
+            background: transparent;
+            border: 1px solid #FFD700;
+            color: #FFD700;
+            font-family: 'Cinzel', serif;
+            font-size: 1.2rem;
+            letter-spacing: 3px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        #enter-experience-btn:hover {
+            background: #FFD700;
+            color: #000;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+        }
+
+        /* Helper to hide overlay */
+        .fade-out { opacity: 0; pointer-events: none; }
+
+
+        /* --- MAIN SITE STYLES --- */
         h1 { font-size: 3rem; margin-bottom: 10px; letter-spacing: 5px; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
         p { margin-bottom: 50px; color: #aaa; letter-spacing: 2px; }
         
-        /* Container Logic */
         .container { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; transition: opacity 0.5s; }
         .hidden { display: none !important; opacity: 0; }
         
@@ -56,7 +121,6 @@
         .hindi-font { font-family: 'Rozha One', serif; }
         .btn-sub { font-size: 0.8rem; margin-top: 10px; opacity: 0.7; font-family: sans-serif; letter-spacing: 1px; }
 
-        /* Documentation Link */
         .docs-link {
             margin-top: 60px;
             color: rgba(255, 215, 0, 0.5);
@@ -69,7 +133,6 @@
         }
         .docs-link:hover { color: #FFD700; border-bottom: 1px solid #FFD700; }
 
-        /* 🔥 CREATOR SIGNATURE STYLES 🔥 */
         .creator-credit {
             position: fixed;
             bottom: 20px;
@@ -77,7 +140,7 @@
             text-align: center;
             font-family: 'Cinzel', serif;
             font-size: 0.75rem;
-            color: rgba(255, 215, 0, 0.4); /* Faded Gold */
+            color: rgba(255, 215, 0, 0.4);
             letter-spacing: 3px;
             text-transform: uppercase;
             pointer-events: none;
@@ -91,7 +154,6 @@
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
         }
 
-        /* 🔥 MOBILE HINT STYLE (DESKTOP ONLY) 🔥 */
         #mobile-hint {
             color: #FFD700;
             font-family: 'Cinzel', serif;
@@ -108,9 +170,25 @@
             50% { opacity: 1; }
             100% { opacity: 0.6; }
         }
+        @keyframes glow {
+            from { text-shadow: 0 0 10px #FFD700; }
+            to { text-shadow: 0 0 30px #FFD700, 0 0 10px white; }
+        }
     </style>
 </head>
 <body>
+
+    <div id="intro-overlay">
+        <video id="intro-video" playsinline>
+            <source src="assets/videos/intro.mp4" type="video/mp4">
+        </video>
+        
+        <div id="intro-content">
+            <h1 class="intro-title">THE TRUTH</h1>
+            <button id="enter-experience-btn">ENTER THE LEGEND</button>
+        </div>
+    </div>
+
 
     <h1>THE TRUTH</h1>
     <p id="instruction-text">Choose your language / अपनी भाषा चुनें</p>
@@ -152,12 +230,30 @@
     </div>
 
     <script>
-        let selectedLang = 'en'; // Store user choice
+        // --- 🎬 INTRO LOGIC ---
+        const introOverlay = document.getElementById('intro-overlay');
+        const introVideo = document.getElementById('intro-video');
+        const enterBtn = document.getElementById('enter-experience-btn');
+        const introContent = document.getElementById('intro-content');
 
-        // 1. Detect Device Immediately
+        enterBtn.addEventListener('click', () => {
+            introContent.style.opacity = '0'; // Hide button
+            introVideo.style.opacity = '1';   // Show video player
+            introVideo.play();                // Play with sound
+        });
+
+        introVideo.addEventListener('ended', () => {
+            introOverlay.classList.add('fade-out'); // Fade overlay
+            setTimeout(() => {
+                introOverlay.style.display = 'none'; // Remove from layout
+            }, 1500);
+        });
+
+        // --- EXISTING LOGIC ---
+        let selectedLang = 'en'; 
+
         const isMobile = /iPhone|Android|iPad/i.test(navigator.userAgent);
         
-        // 2. If Desktop -> Show the AR Hint
         if (!isMobile) {
             document.getElementById('mobile-hint').classList.remove('hidden');
         }
@@ -166,18 +262,15 @@
             selectedLang = lang;
             
             if (isMobile) {
-                // If Mobile: Show Mode Selection (Web vs AR)
                 document.getElementById('lang-selection').classList.add('hidden');
                 document.getElementById('mode-selection').classList.remove('hidden');
                 
-                // Update instruction text based on language
                 const instruction = document.getElementById('instruction-text');
                 instruction.innerText = lang === 'hi' 
                     ? "अनुभव चुनें (Choose Mode)" 
                     : "Choose Experience Mode";
                     
             } else {
-                // If Desktop: Auto-redirect to Web
                 goToMode('web');
             }
         }
