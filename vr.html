@@ -23,7 +23,7 @@
         }
         button:active { transform: scale(0.95); background: #fff; }
         
-        /* DEBUG CONSOLE (To see errors on phone) */
+        /* DEBUG CONSOLE */
         #debug-console {
             position: absolute; top: 0; left: 0; width: 100%; 
             color: #ff4444; font-family: monospace; font-size: 12px;
@@ -42,8 +42,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+                "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
             }
         }
     </script>
@@ -66,19 +66,24 @@
     <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
 
     <script>
-        // --- ERROR TRAP ---
-        // This catches errors and prints them to the screen so you can see them!
+        // 1. Catch Script Errors
         window.onerror = function(msg, url, line) {
-            const log = document.getElementById('debug-console');
-            log.innerHTML += `❌ ERROR: ${msg}\nLine: ${line}\n`;
-            document.getElementById('status-text').innerText = "System Error. Check top left.";
+            document.getElementById('debug-console').innerHTML += `❌ ERROR: ${msg}\nLine: ${line}\n`;
+            document.getElementById('status-text').innerText = "System Failure. Check log.";
             document.getElementById('status-text').style.color = "red";
-            return false;
         };
+
+        // 2. Catch Network/Loading Errors (The missing link!)
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK') {
+                document.getElementById('debug-console').innerHTML += `❌ LOAD FAIL: ${e.target.src || e.target.href}\n`;
+                document.getElementById('status-text').innerText = "Network Error. Cannot load 3D Engine.";
+                document.getElementById('status-text').style.color = "red";
+            }
+        }, true);
         
         function log(msg) {
             console.log(msg);
-            // Uncomment next line to see ALL logs on screen (spammy)
             // document.getElementById('debug-console').innerHTML += `ℹ️ ${msg}\n`;
         }
     </script>
@@ -89,11 +94,11 @@
         import * as THREE from 'three';
         import { DeviceOrientationControls } from 'three/addons/controls/DeviceOrientationControls.js';
 
-        // If we got here, imports worked!
+        // ✅ If we get here, imports are working!
         document.getElementById('status-text').innerText = "System Ready. Press Start.";
         document.getElementById('status-text').style.color = "#0f0";
 
-        // SETUP
+        // CONFIG
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
         
@@ -138,8 +143,6 @@
                     mesh.position.z = layer.z;
                     mesh.scale.set(layer.scale, layer.scale, 1);
                     group.add(mesh);
-                }, undefined, (err) => {
-                    log(`Error loading texture: ${path}`);
                 });
             });
             worldGroup.add(group);
@@ -152,32 +155,26 @@
         
         startBtn.addEventListener('click', async () => {
             log("Start button clicked...");
-            startBtn.innerText = "Loading...";
+            startBtn.innerText = "Starting...";
             
             try {
-                // 1. Audio
                 const music = document.getElementById('bg-music');
                 if(music) music.play().catch(e => log("Audio play warning: " + e));
 
-                // 2. Hide Overlay
                 document.getElementById('overlay').style.display = 'none';
 
-                // 3. Init Controls
                 controls = new DeviceOrientationControls(camera);
                 
-                // 4. iOS Permission
+                // iOS Permissions
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    log("Requesting iOS permission...");
                     const response = await DeviceOrientationEvent.requestPermission();
                     if (response === 'granted') {
                         controls.connect();
-                        log("iOS Permission Granted");
                     } else {
-                        alert("Permission denied. You cannot look around in VR.");
+                        alert("Permission denied. VR requires orientation.");
                     }
                 } else {
                     controls.connect();
-                    log("Controls connected (Android/Desktop)");
                 }
 
             } catch(e) {
@@ -193,26 +190,22 @@
             requestAnimationFrame(animate);
             if(controls) controls.update();
 
-            // Auto-move forward slowly
             worldGroup.position.z += 0.002; 
 
             const w = window.innerWidth, h = window.innerHeight;
             renderer.setScissorTest(true);
 
-            // Left
             renderer.setScissor(0, 0, w/2, h);
             renderer.setViewport(0, 0, w/2, h);
             camera.position.x = -eyeSep/2;
             renderer.render(scene, camera);
 
-            // Right
             renderer.setScissor(w/2, 0, w/2, h);
             renderer.setViewport(w/2, 0, w/2, h);
             camera.position.x = eyeSep/2;
             renderer.render(scene, camera);
         }
         animate();
-        log("Render loop started.");
     </script>
 </body>
 </html>
