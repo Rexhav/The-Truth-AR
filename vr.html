@@ -58,7 +58,7 @@
 
     <div id="overlay">
         <h1>VR MODE</h1>
-        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look down at buttons to move</p>
+        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look down to move</p>
         <button id="start-btn">START EXPERIENCE</button>
     </div>
 
@@ -93,7 +93,7 @@
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         scene.add(ambientLight);
 
-        // --- 🎥 CAMERA SPHERE (SPHERICAL VIEW) ---
+        // --- 🎥 CAMERA SPHERE ---
         const video = document.getElementById('video-source');
         const videoTexture = new THREE.VideoTexture(video);
         videoTexture.minFilter = THREE.LinearFilter;
@@ -103,14 +103,15 @@
         camGeo.scale(-1, 1, 1); 
         const camMat = new THREE.MeshBasicMaterial({ map: videoTexture });
         const camMesh = new THREE.Mesh(camGeo, camMat);
-        
         camera.add(camMesh);
         scene.add(camera);
 
-        // --- 3D PANELS ---
+        // --- 3D PANELS (PUSHED BACK & SCALED UP) ---
         const textureLoader = new THREE.TextureLoader();
         const panelPositions = []; 
-        const PANEL_DISTANCE = 1.5;
+        
+        // 🔥 BIG CHANGE: Increased Distance & Scale
+        const PANEL_DISTANCE = 6.0; // Was 1.5
 
         function createPanel(index, zPos) {
             const group = new THREE.Group();
@@ -118,7 +119,8 @@
             
             ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
                 const zOffsets = [-0.3, -0.1, 0.1];
-                const scales = [1.5, 1.2, 1.0];
+                // 🔥 SCALED UP 3X
+                const scales = [4.5, 3.6, 3.0]; 
                 const path = `assets/panels/panel${index}${suffix}`;
                 textureLoader.load(path, (tex) => {
                     tex.encoding = THREE.sRGBEncoding;
@@ -141,27 +143,23 @@
         const buttonGroup = new THREE.Group();
         scene.add(buttonGroup); 
         
-        // Positioned in WORLD SPACE (Stationary), but close to start
+        // Buttons stay close (1.2m away), Panels start far (6.0m away)
         buttonGroup.position.set(0, -0.8, -1.2); 
-        buttonGroup.rotation.x = -0.3; // Tilted up slightly
+        buttonGroup.rotation.x = -0.3; 
 
         function createButton(name, x, color) {
             const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 128; // High Res
+            canvas.width = 512; canvas.height = 128;
             const ctx = canvas.getContext('2d');
             
-            // Glass Style Background
-            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
             ctx.strokeStyle = color;
             ctx.lineWidth = 10;
-            
-            // Round Rect
             ctx.beginPath();
             ctx.roundRect(10, 10, 492, 108, 30);
             ctx.fill();
             ctx.stroke();
             
-            // Text
             ctx.fillStyle = color;
             ctx.font = "bold 60px Arial";
             ctx.textAlign = "center";
@@ -178,7 +176,6 @@
             return mesh;
         }
 
-        // Horizontal Layout: PREV | RESET | NEXT
         createButton("PREV", -0.9, "#FFD700");
         createButton("RESET", 0, "#FF4444");
         createButton("NEXT", 0.9, "#00FF00");
@@ -191,10 +188,6 @@
         let currentPanelIndex = 0;
 
         function updateGaze(dt) {
-            // Keep buttons near camera, but NOT locked to rotation
-            // They follow your body (position) but you can look away from them
-            // Since camera is at 0,0,0 usually, we just keep them at fixed Z relative to camera
-            
             raycaster.setFromCamera(center, camera);
             const intersects = raycaster.intersectObjects(buttonGroup.children);
 
@@ -210,12 +203,10 @@
                     lookTimer = 0;
                 } else {
                     lookTimer += dt;
-                    if (lookTimer > 1.0) { // 1.0s Trigger
-                        if (hit.userData.type === "NEXT") {
-                            moveForward();
-                        } else if (hit.userData.type === "PREV") {
-                            moveBackward();
-                        } else if (hit.userData.type === "RESET") {
+                    if (lookTimer > 1.0) { 
+                        if (hit.userData.type === "NEXT") moveForward();
+                        else if (hit.userData.type === "PREV") moveBackward();
+                        else if (hit.userData.type === "RESET") {
                             worldGroup.position.z = 0;
                             currentPanelIndex = 0;
                         }
@@ -231,12 +222,12 @@
         function moveForward() {
             currentPanelIndex++;
             const targetZ = currentPanelIndex * PANEL_DISTANCE;
-            new TWEEN.Tween(worldGroup.position).to({ z: targetZ }, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+            new TWEEN.Tween(worldGroup.position).to({ z: targetZ }, 800).easing(TWEEN.Easing.Quadratic.Out).start();
         }
         function moveBackward() {
             if(currentPanelIndex > 0) currentPanelIndex--;
             const targetZ = currentPanelIndex * PANEL_DISTANCE;
-            new TWEEN.Tween(worldGroup.position).to({ z: targetZ }, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+            new TWEEN.Tween(worldGroup.position).to({ z: targetZ }, 800).easing(TWEEN.Easing.Quadratic.Out).start();
         }
 
         // --- AUDIO ---
@@ -277,6 +268,7 @@
 
         let currentActivePanel = -1;
         function checkProximity() {
+            // Updated proximity logic for larger distances
             const camPos = new THREE.Vector3(0,0,0);
             let closestPanel = -1;
             let closestDist = 9999;
@@ -284,7 +276,7 @@
                 const panelWorldPos = new THREE.Vector3(0, 0, p.z);
                 panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
                 const dist = camPos.distanceTo(panelWorldPos);
-                if (dist < 1.5) { 
+                if (dist < 4.0) { // Increased trigger zone
                     if (dist < closestDist) { closestDist = dist; closestPanel = p.id; }
                 }
             });
