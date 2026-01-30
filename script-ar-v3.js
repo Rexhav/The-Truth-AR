@@ -10,12 +10,6 @@ console.log("AR Reality Mode. Language:", currentLang);
 const TOTAL_PANELS = 11;
 const PANEL_DISTANCE = 1.35; 
 
-// --- VR STATE ---
-let isVR = false;
-const eyeSeparation = 0.06; // 6cm IPD
-let controls = null; 
-let DeviceOrientationControls = null; // We will load this later
-
 // --- 2. BILINGUAL TEXT DATA ---
 const STORY_DATA = {
     1: {
@@ -67,7 +61,7 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true; // Enabled by default for AR
+renderer.xr.enabled = true; // WebXR required for AR
 document.body.appendChild(renderer.domElement);
 
 // --- AR BUTTON ---
@@ -75,8 +69,7 @@ const arButton = ARButton.createButton(renderer, {
     optionalFeatures: ['dom-overlay'], 
     domOverlay: { root: document.body } 
 });
-// Ensure button is visible
-arButton.style.zIndex = '9999';
+arButton.style.zIndex = '9999'; // Ensure visibility
 document.body.appendChild(arButton);
 
 const listener = new THREE.AudioListener();
@@ -145,86 +138,7 @@ const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
 scene.add(light);
 
 
-// --- 🔥 VR BUTTON LOGIC (SAFE LOADING) 🔥 ---
-const vrBtn = document.getElementById('vr-btn');
-if (vrBtn) {
-    vrBtn.addEventListener('click', async () => {
-        
-        // 1. DYNAMIC LOAD (Prevents Crash)
-        if (!DeviceOrientationControls) {
-            try {
-                // Load controls ONLY when needed
-                const mod = await import('three/addons/controls/DeviceOrientationControls.js');
-                DeviceOrientationControls = mod.DeviceOrientationControls;
-            } catch (e) {
-                alert("Could not load VR Controls. Check internet connection.");
-                return;
-            }
-        }
-
-        isVR = !isVR; // Toggle State
-        const warning = document.getElementById('ar-warning');
-        
-        if (isVR) {
-            // ENTERING VR MODE
-            vrBtn.style.background = "#FFD700";
-            vrBtn.style.color = "#000";
-            vrBtn.innerHTML = "EXIT VR";
-            if(warning) warning.style.display = 'none';
-
-            // Disable AR logic
-            renderer.xr.enabled = false; 
-            
-            // Set Black Background
-            document.body.style.background = "#000";
-            renderer.domElement.style.background = "#000";
-
-            // Initialize Gyro Controls
-            if (!controls && DeviceOrientationControls) {
-                controls = new DeviceOrientationControls(camera);
-                
-                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    try {
-                        const response = await DeviceOrientationEvent.requestPermission();
-                        if (response === 'granted') {
-                            controls.connect();
-                        } else {
-                            alert("Permission denied. VR requires orientation access.");
-                        }
-                    } catch (e) {
-                        console.error(e);
-                    }
-                } else {
-                    controls.connect(); 
-                }
-            } else if (controls) {
-                controls.connect();
-            }
-
-        } else {
-            // EXITING VR MODE
-            vrBtn.style.background = "rgba(0,0,0,0.6)";
-            vrBtn.style.color = "#FFD700";
-            vrBtn.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 6H9v-2h2v2zm4 0h-2v-2h2v2z"/></svg> VR MODE`;
-
-            // Re-enable AR logic
-            renderer.xr.enabled = true;
-            document.body.style.background = "transparent";
-            renderer.domElement.style.background = "transparent";
-            
-            renderer.setScissorTest(false);
-            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-            if (controls) controls.disconnect();
-            
-            // Reset Camera rotation for AR
-            camera.rotation.set(0,0,0);
-        }
-        
-        onWindowResize();
-    });
-}
-
-// Resize Handler
+// --- RESIZE HANDLER ---
 window.addEventListener('resize', onWindowResize, false);
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -232,15 +146,21 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// AR Start Handler
+// --- AR START HANDLER ---
 arButton.addEventListener('click', () => {
+    // 1. Hide the warning overlay
     const warning = document.getElementById('ar-warning');
     if (warning) warning.style.display = 'none';
     
+    // 2. Play Background Music
     const bgMusic = document.getElementById('ar-bg-music');
-    if(bgMusic) { bgMusic.volume = 0.2; bgMusic.play().catch(e => {}); }
+    if(bgMusic) { 
+        bgMusic.volume = 0.2; 
+        bgMusic.play().catch(e => console.log("Bg Music Autoplay blocked")); 
+    }
     if (listener.context.state === 'suspended') listener.context.resume();
     
+    // 3. Show Gesture Guide briefly
     const guide = document.getElementById('gesture-guide');
     if(guide) {
         setTimeout(() => { guide.style.opacity = '1'; }, 1000);
@@ -248,7 +168,7 @@ arButton.addEventListener('click', () => {
     }
 });
 
-// --- INTERACTION ---
+// --- INTERACTION (DRAG & PINCH) ---
 let touchStartX = 0;
 let isDragging = false;
 let initialDistance = 0;
@@ -280,7 +200,7 @@ document.body.addEventListener('touchmove', (e) => {
 });
 document.body.addEventListener('touchend', () => { isDragging = false; });
 
-// --- PROXIMITY LOGIC ---
+// --- PROXIMITY LOGIC (AUDIO & SUBTITLES) ---
 const subtitleText = document.getElementById('subtitle-text');
 let currentActivePanel = -1;
 
@@ -320,36 +240,8 @@ function checkProximity() {
     }
 }
 
-// --- RENDER LOOP ---
+// --- RENDER LOOP (PURE AR) ---
 renderer.setAnimationLoop(() => {
     checkProximity();
-
-    if (isVR) {
-        // --- 3D CARDBOARD MODE ---
-        if (controls) controls.update();
-
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        renderer.setScissorTest(true);
-
-        // Left Eye
-        renderer.setScissor(0, 0, width / 2, height);
-        renderer.setViewport(0, 0, width / 2, height);
-        camera.position.x -= eyeSeparation / 2;
-        renderer.render(scene, camera);
-        camera.position.x += eyeSeparation / 2;
-
-        // Right Eye
-        renderer.setScissor(width / 2, 0, width / 2, height);
-        renderer.setViewport(width / 2, 0, width / 2, height);
-        camera.position.x += eyeSeparation / 2;
-        renderer.render(scene, camera);
-        camera.position.x -= eyeSeparation / 2;
-
-    } else {
-        // --- STANDARD AR MODE ---
-        renderer.setScissorTest(false);
-        renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-        renderer.render(scene, camera);
-    }
+    renderer.render(scene, camera);
 });

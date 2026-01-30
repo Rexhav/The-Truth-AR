@@ -40,18 +40,15 @@
             transition: opacity 1.5s ease-out;
         }
 
-      #intro-video {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    
-    /* 🔥 UPDATED LINE 🔥 */
-    object-fit: contain; /* Keeps the ratio, adds black bars */
-    
-    background: #000; /* Ensures the bars are black */
-    opacity: 0; 
-    transition: opacity 0.8s;
-}
+        #intro-video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: contain; /* Keeps the ratio, adds black bars */
+            background: #000; 
+            opacity: 0; 
+            transition: opacity 0.8s;
+        }
 
         #intro-content {
             position: relative;
@@ -87,9 +84,7 @@
             box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
         }
 
-        /* Helper to hide overlay */
         .fade-out { opacity: 0; pointer-events: none; }
-
 
         /* --- MAIN SITE STYLES --- */
         h1 { font-size: 3rem; margin-bottom: 10px; letter-spacing: 5px; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
@@ -222,6 +217,11 @@
         <div class="choice-btn" onclick="goToMode('ar')">
             AR MODE
             <span class="btn-sub">Walk Inside</span>
+        </div>
+
+        <div class="choice-btn" onclick="goToMode('vr')">
+            VR MODE
+            <span class="btn-sub">Use Headset</span>
         </div>
     </div>
 

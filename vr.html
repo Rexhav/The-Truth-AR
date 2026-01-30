@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>The Truth - VR Mode</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rozha+One&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
+        
+        /* START OVERLAY */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 100;
+            text-align: center; color: #FFD700;
+        }
+        button {
+            padding: 15px 30px; font-size: 1.2rem; background: #FFD700; color: #000;
+            border: none; border-radius: 5px; margin-top: 20px; font-family: 'Cinzel', serif;
+            cursor: pointer;
+        }
+        
+        /* HOME BUTTON */
+        #home-btn {
+            position: absolute; top: 20px; left: 20px; z-index: 50;
+            background: rgba(0,0,0,0.5); padding: 10px; border-radius: 50%;
+            border: 1px solid #FFD700; display: flex;
+        }
+
+        /* SUBTITLES */
+        #subtitle-container {
+            position: absolute; bottom: 20%; width: 100%; text-align: center; pointer-events: none; z-index: 10;
+        }
+        #subtitle-text {
+            color: #FFD700; font-size: 1.2rem; background: rgba(0,0,0,0.5); 
+            padding: 10px 20px; border-radius: 10px; display: inline-block;
+            opacity: 0; transition: opacity 0.5s;
+        }
+        #subtitle-text.visible { opacity: 1; }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <a href="index.html" id="home-btn">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+    </a>
+
+    <div id="overlay">
+        <h1>ENTER THE VOID</h1>
+        <p>Put your phone in a VR Headset (Cardboard)</p>
+        <button id="start-btn">START VR</button>
+    </div>
+
+    <div id="subtitle-container"><div id="subtitle-text"></div></div>
+
+    <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { DeviceOrientationControls } from 'three/addons/controls/DeviceOrientationControls.js';
+
+        // SETUP
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentLang = urlParams.get('lang') || 'en';
+        
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // GROUP
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        // LIGHTS
+        const light = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
+        scene.add(light);
+
+        // CONTROLS
+        let controls;
+
+        // --- LOAD CONTENT (PANELS) ---
+        const textureLoader = new THREE.TextureLoader();
+        const panelPositions = [];
+        const PANEL_DISTANCE = 1.5;
+
+        function createPanel(index, zPos) {
+            const group = new THREE.Group();
+            group.position.set(0, 0, -zPos);
+            
+            ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
+                const zOffsets = [-0.3, -0.1, 0.1];
+                const scales = [1.5, 1.2, 1.0];
+                
+                textureLoader.load(`assets/panels/panel${index}${suffix}`, (tex) => {
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    const aspect = tex.image.width / tex.image.height;
+                    const mesh = new THREE.Mesh(
+                        new THREE.PlaneGeometry(aspect, 1),
+                        new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+                    );
+                    mesh.position.z = zOffsets[i];
+                    mesh.scale.set(scales[i], scales[i], 1);
+                    group.add(mesh);
+                });
+            });
+            worldGroup.add(group);
+            panelPositions.push({ id: index, z: -zPos });
+        }
+
+        for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
+
+        // --- AUDIO ---
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+        const panelAudios = {};
+        const audioLoader = new THREE.AudioLoader();
+
+        [1,2,3,4,6,7,8,9,10,11].forEach(i => {
+            const sound = new THREE.Audio(listener);
+            audioLoader.load(`assets/audio/panel${i}_${currentLang}.mp3`, (buffer) => {
+                sound.setBuffer(buffer);
+                panelAudios[i] = sound;
+            });
+        });
+
+        // --- START LOGIC ---
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('bg-music').play();
+
+            // INIT CONTROLS
+            controls = new DeviceOrientationControls(camera);
+            
+            // iOS PERMISSION
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const response = await DeviceOrientationEvent.requestPermission();
+                    if (response === 'granted') controls.connect();
+                    else alert("Permission denied. VR requires orientation.");
+                } catch (e) { console.error(e); }
+            } else {
+                controls.connect();
+            }
+        });
+
+        // --- RENDER LOOP (SPLIT SCREEN) ---
+        const eyeSep = 0.06;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            if(controls) controls.update();
+
+            // PROXIMITY CHECK (Simplified)
+            // In VR, we auto-move the world slowly towards the user or just look around?
+            // For now, let's keep it static so they can look around, or add auto-scroll:
+            worldGroup.position.z += 0.002; // Slow auto-walk forward
+
+            // Check Audio Trigger
+            // ... (Audio logic similar to AR but simpler) ...
+
+            // RENDER
+            const w = window.innerWidth, h = window.innerHeight;
+            renderer.setScissorTest(true);
+
+            // Left
+            renderer.setScissor(0, 0, w/2, h);
+            renderer.setViewport(0, 0, w/2, h);
+            camera.position.x = -eyeSep/2;
+            renderer.render(scene, camera);
+
+            // Right
+            renderer.setScissor(w/2, 0, w/2, h);
+            renderer.setViewport(w/2, 0, w/2, h);
+            camera.position.x = eyeSep/2;
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
