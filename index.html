@@ -40,14 +40,18 @@
             transition: opacity 1.5s ease-out;
         }
 
-        #intro-video {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover;
-            opacity: 0; /* Hidden until played */
-            transition: opacity 0.8s;
-        }
+      #intro-video {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    
+    /* 🔥 UPDATED LINE 🔥 */
+    object-fit: contain; /* Keeps the ratio, adds black bars */
+    
+    background: #000; /* Ensures the bars are black */
+    opacity: 0; 
+    transition: opacity 0.8s;
+}
 
         #intro-content {
             position: relative;

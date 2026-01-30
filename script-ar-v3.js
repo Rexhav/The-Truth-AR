@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
+import { DeviceOrientationControls } from 'three/addons/controls/DeviceOrientationControls.js';
 
 // --- 1. LANGUAGE CONFIGURATION ---
 const urlParams = new URLSearchParams(window.location.search);
@@ -12,7 +13,8 @@ const PANEL_DISTANCE = 1.35;
 
 // --- VR STATE ---
 let isVR = false;
-const eyeSeparation = 0.06; // 6cm (Standard human IPD)
+const eyeSeparation = 0.06; // 6cm IPD
+let controls = null; // Will store Gyro controls
 
 // --- 2. BILINGUAL TEXT DATA ---
 const STORY_DATA = {
@@ -65,10 +67,10 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
+renderer.xr.enabled = true; // Enabled by default for AR
 document.body.appendChild(renderer.domElement);
 
-// --- AR BUTTON (Standard WebXR Button) ---
+// --- AR BUTTON ---
 const arButton = ARButton.createButton(renderer, {
     optionalFeatures: ['dom-overlay'], 
     domOverlay: { root: document.body } 
@@ -78,7 +80,7 @@ document.body.appendChild(arButton);
 const listener = new THREE.AudioListener();
 camera.add(listener);
 
-// --- WORLD GROUP (The "Tunnel") ---
+// --- WORLD GROUP ---
 const worldGroup = new THREE.Group();
 scene.add(worldGroup);
 
@@ -90,13 +92,12 @@ const audioPanels = [1, 2, 3, 4, 6, 7, 8, 9, 10, 11];
 audioPanels.forEach(i => {
     const sound = new THREE.Audio(listener);
     const audioPath = `assets/audio/panel${i}_${currentLang}.mp3`;
-    
     audioLoader.load(audioPath, (buffer) => {
         sound.setBuffer(buffer);
         sound.setLoop(false);
         sound.setVolume(1.0);
         panelAudios[i] = sound;
-    }, undefined, (err) => console.warn(`Missing AR audio: ${audioPath}`));
+    }, undefined, (err) => console.warn(`Missing audio: ${audioPath}`));
 });
 
 // --- PANELS ---
@@ -105,7 +106,6 @@ const panelPositions = [];
 
 function createPanel(index, zPos) {
     const group = new THREE.Group();
-    // Position inside the worldGroup
     group.position.set(0, 0.0, -zPos); 
 
     const layers = [
@@ -119,17 +119,11 @@ function createPanel(index, zPos) {
         textureLoader.load(path, (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace;
             const aspect = tex.image.width / tex.image.height;
-            const height = 1.0; 
-            const width = height * aspect;
-
-            const geo = new THREE.PlaneGeometry(width, height);
+            const width = 1.0 * aspect; 
+            const geo = new THREE.PlaneGeometry(width, 1.0);
             const mat = new THREE.MeshBasicMaterial({ 
-                map: tex, 
-                transparent: true, 
-                opacity: 0.95, 
-                side: THREE.DoubleSide 
+                map: tex, transparent: true, opacity: 0.95, side: THREE.DoubleSide 
             });
-
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.z = layer.z;
             mesh.scale.set(layer.scale, layer.scale, 1);
@@ -149,44 +143,74 @@ const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
 scene.add(light);
 
 
-// --- VR BUTTON LOGIC ---
+// --- 🔥 VR BUTTON LOGIC (THE FIX) 🔥 ---
 const vrBtn = document.getElementById('vr-btn');
 if (vrBtn) {
-    vrBtn.addEventListener('click', () => {
-        isVR = !isVR;
+    vrBtn.addEventListener('click', async () => {
+        isVR = !isVR; // Toggle State
         const warning = document.getElementById('ar-warning');
         
         if (isVR) {
+            // ENTERING VR MODE
             vrBtn.style.background = "#FFD700";
             vrBtn.style.color = "#000";
             vrBtn.innerHTML = "EXIT VR";
-            
-            // For VR, we prefer a black background to block real world distractions
-            document.body.style.background = "#000";
-            if(renderer.domElement) renderer.domElement.style.background = "#000";
-
-            // Hide UI
             if(warning) warning.style.display = 'none';
 
+            // 1. Disable AR logic
+            renderer.xr.enabled = false; 
+            
+            // 2. Set Black Background (Immersive Cardboard)
+            document.body.style.background = "#000";
+            renderer.domElement.style.background = "#000";
+
+            // 3. Initialize Gyro Controls (Device Orientation)
+            if (!controls) {
+                controls = new DeviceOrientationControls(camera);
+                
+                // iOS requires permission for Gyro
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    try {
+                        const response = await DeviceOrientationEvent.requestPermission();
+                        if (response === 'granted') {
+                            controls.connect();
+                        } else {
+                            alert("Permission denied. VR requires orientation access.");
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                } else {
+                    controls.connect(); // Android usually just works
+                }
+            }
+            controls.connect();
+
         } else {
+            // EXITING VR MODE (Back to AR)
             vrBtn.style.background = "rgba(0,0,0,0.6)";
             vrBtn.style.color = "#FFD700";
             vrBtn.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 6H9v-2h2v2zm4 0h-2v-2h2v2z"/></svg> VR MODE`;
 
-            // Back to AR (Transparent)
+            // Re-enable AR logic
+            renderer.xr.enabled = true;
             document.body.style.background = "transparent";
-            if(renderer.domElement) renderer.domElement.style.background = "transparent";
+            renderer.domElement.style.background = "transparent";
             
-            // Reset Camera
+            // Clean up
             renderer.setScissorTest(false);
             renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+            if (controls) controls.disconnect();
+            
+            // Reset Camera rotation for AR
+            camera.rotation.set(0,0,0);
         }
         
-        onWindowResize(); // Force resize to clean up
+        onWindowResize();
     });
 }
 
-// Handle Resize
+// Resize Handler
 window.addEventListener('resize', onWindowResize, false);
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -194,26 +218,17 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-
-// --- START LOGIC (AR SESSION) ---
+// AR Start Handler
 arButton.addEventListener('click', () => {
-    // 1. Hide warning
     const warning = document.getElementById('ar-warning');
     if (warning) warning.style.display = 'none';
-
-    // 2. Play BG Music
-    const bgMusic = document.getElementById('ar-bg-music');
-    if(bgMusic) {
-        bgMusic.volume = 0.2; 
-        bgMusic.play().catch(e => console.log("AR BG Music blocked:", e));
-    }
     
-    // 3. Wake up Audio Context
-    if (listener.context.state === 'suspended') {
-        listener.context.resume();
-    }
-
-    // 4. SHOW GESTURE GUIDE
+    // Resume Audio
+    const bgMusic = document.getElementById('ar-bg-music');
+    if(bgMusic) { bgMusic.volume = 0.2; bgMusic.play().catch(e => {}); }
+    if (listener.context.state === 'suspended') listener.context.resume();
+    
+    // Show gesture guide
     const guide = document.getElementById('gesture-guide');
     if(guide) {
         setTimeout(() => { guide.style.opacity = '1'; }, 1000);
@@ -221,8 +236,7 @@ arButton.addEventListener('click', () => {
     }
 });
 
-
-// --- INTERACTION: DRAG & PINCH ---
+// --- INTERACTION ---
 let touchStartX = 0;
 let isDragging = false;
 let initialDistance = 0;
@@ -248,16 +262,11 @@ document.body.addEventListener('touchmove', (e) => {
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const currentDistance = Math.sqrt(dx * dx + dy * dy);
         const delta = currentDistance - initialDistance;
-        
         worldGroup.position.z += delta * 0.01; 
         initialDistance = currentDistance;
     }
 });
-
-document.body.addEventListener('touchend', () => {
-    isDragging = false;
-});
-
+document.body.addEventListener('touchend', () => { isDragging = false; });
 
 // --- PROXIMITY LOGIC ---
 const subtitleText = document.getElementById('subtitle-text');
@@ -266,32 +275,23 @@ let currentActivePanel = -1;
 function checkProximity() {
     const camPos = new THREE.Vector3();
     camera.getWorldPosition(camPos);
-    
     let closestPanel = -1;
     let closestDist = 9999;
 
     panelPositions.forEach(p => {
         const panelWorldPos = new THREE.Vector3(0, 0, p.z);
         panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
-
         const dist = camPos.distanceTo(panelWorldPos);
-        
         if (dist < 1.2) { 
-            if (dist < closestDist) {
-                closestDist = dist;
-                closestPanel = p.id;
-            }
+            if (dist < closestDist) { closestDist = dist; closestPanel = p.id; }
         }
     });
 
     if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
-        if (currentActivePanel !== -1 && panelAudios[currentActivePanel] && panelAudios[currentActivePanel].isPlaying) {
+        if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) {
             panelAudios[currentActivePanel].stop();
         }
-
-        if (panelAudios[closestPanel]) {
-            panelAudios[closestPanel].play();
-        }
+        if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
 
         const textData = STORY_DATA[closestPanel];
         const textRaw = textData ? textData[currentLang] : "";
@@ -299,56 +299,46 @@ function checkProximity() {
         if (textRaw) {
             subtitleText.innerHTML = textRaw;
             subtitleText.classList.add('visible');
-
-            if (currentLang === 'hi') {
-                subtitleText.style.fontFamily = "'Rozha One', serif";
-                subtitleText.style.fontSize = "1.5rem";
-                subtitleText.style.lineHeight = "1.5";
-            } else {
-                subtitleText.style.fontFamily = "'Cinzel', serif";
-                subtitleText.style.fontSize = "1.2rem";
-                subtitleText.style.lineHeight = "1.3";
-            }
+            subtitleText.style.fontFamily = currentLang === 'hi' ? "'Rozha One', serif" : "'Cinzel', serif";
+            subtitleText.style.fontSize = currentLang === 'hi' ? "1.5rem" : "1.2rem";
         } else {
             subtitleText.classList.remove('visible');
         }
-
         currentActivePanel = closestPanel;
     }
 }
 
-
-// --- MAIN RENDER LOOP (WITH VR SUPPORT) ---
+// --- 🔥 RENDER LOOP (FIXED) 🔥 ---
 renderer.setAnimationLoop(() => {
-    
-    // Check Logic (Audio/Distance)
     checkProximity();
 
     if (isVR) {
-        // --- VR SPLIT SCREEN MODE ---
+        // --- 3D CARDBOARD MODE (No AR) ---
+        // 1. Update Controls (Look around with phone)
+        if (controls) controls.update();
+
+        // 2. Render Split Screen
         const width = window.innerWidth;
         const height = window.innerHeight;
-
         renderer.setScissorTest(true);
 
-        // 1. LEFT EYE
+        // Left Eye
         renderer.setScissor(0, 0, width / 2, height);
         renderer.setViewport(0, 0, width / 2, height);
-        
-        camera.position.x -= eyeSeparation / 2; // Move cam left
+        camera.position.x -= eyeSeparation / 2;
         renderer.render(scene, camera);
-        camera.position.x += eyeSeparation / 2; // Reset
+        camera.position.x += eyeSeparation / 2;
 
-        // 2. RIGHT EYE
+        // Right Eye
         renderer.setScissor(width / 2, 0, width / 2, height);
         renderer.setViewport(width / 2, 0, width / 2, height);
-        
-        camera.position.x += eyeSeparation / 2; // Move cam right
+        camera.position.x += eyeSeparation / 2;
         renderer.render(scene, camera);
-        camera.position.x -= eyeSeparation / 2; // Reset
+        camera.position.x -= eyeSeparation / 2;
 
     } else {
         // --- STANDARD AR MODE ---
+        // Just render normally
         renderer.setScissorTest(false);
         renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
         renderer.render(scene, camera);
