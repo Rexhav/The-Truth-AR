@@ -12,9 +12,7 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
-            text-align: center; color: #FFD700;
-            padding: 20px; box-sizing: border-box;
-            transition: opacity 1s;
+            text-align: center; color: #FFD700; padding: 20px;
         }
         
         button {
@@ -30,7 +28,7 @@
             position: absolute; top: 50%; width: 12px; height: 12px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
             transform: translate(-50%, -50%); pointer-events: none;
-            box-shadow: 0 0 5px white; transition: all 0.2s;
+            box-shadow: 0 0 5px white;
         }
         .reticle.active { 
             background: #FFD700; border-color: #FFD700;
@@ -61,11 +59,10 @@
 
     <div id="overlay">
         <h1>VR CINEMA MODE</h1>
-        <p style="color:#ccc; font-family:sans-serif; line-height:1.6;">
-            1. Turn volume UP.<br>
-            2. Press the button below.<br>
-            3. You have <strong>10 seconds</strong> to put the phone in the headset.<br>
-            4. <strong>Look down</strong> to see controls.
+        <p style="color:#ccc; line-height:1.6;">
+            1. Press the button below.<br>
+            2. <strong>Wait 10s</strong> to put phone in headset.<br>
+            3. Inside VR, <strong>Look at START</strong> to begin.
         </p>
         <button id="start-btn">ENTER VR</button>
     </div>
@@ -76,7 +73,6 @@
     <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 
     <script>
         (function(){const _zee=new THREE.Vector3(0,0,1),_euler=new THREE.Euler,_q0=new THREE.Quaternion,_q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));class DeviceOrientationControls{constructor(e){this.object=e,this.object.rotation.reorder("YXZ"),this.enabled=!0,this.deviceOrientation={},this.screenOrientation=0,this.alphaOffset=0,this.connect()}connect(){this.onScreenOrientationChangeEvent=()=>{this.screenOrientation=window.orientation||0},this.onDeviceOrientationChangeEvent=e=>{this.deviceOrientation=e},this.screenOrientation=window.orientation||0,window.addEventListener("orientationchange",this.onScreenOrientationChangeEvent),window.addEventListener("deviceorientation",this.onDeviceOrientationChangeEvent),this.enabled=!0}disconnect(){window.removeEventListener("orientationchange",this.onScreenOrientationChangeEvent),window.removeEventListener("deviceorientation",this.onDeviceOrientationChangeEvent),this.enabled=!1}update(){if(!1===this.enabled)return;const e=this.deviceOrientation;if(e){const t=e.alpha?THREE.MathUtils.degToRad(e.alpha)+this.alphaOffset:0,n=e.beta?THREE.MathUtils.degToRad(e.beta):0,o=e.gamma?THREE.MathUtils.degToRad(e.gamma):0,i=this.screenOrientation?THREE.MathUtils.degToRad(this.screenOrientation):0;this.setObjectQuaternion(this.object.quaternion,t,n,o,i)}}setObjectQuaternion(e,t,n,o,i){_euler.set(n,t,-o,"YXZ"),e.setFromEuler(_euler),e.multiply(_q1),e.multiply(_q0.setFromAxisAngle(_zee,-i))}}THREE.DeviceOrientationControls=DeviceOrientationControls;})();
@@ -86,7 +82,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const currentLang = urlParams.get('lang') || 'en';
         
-        // --- 1. STORY TEXT DATA ---
         const STORY_DATA = {
             1: { en: "Ram Rajya blossomed. Peace reigned.", hi: "राम राज्य खिल उठा। शांति का वास था।" },
             2: { en: "Hanuman stands guard over Ram.", hi: "हनुमान राम के चारों ओर एक अभेद्य किले..." },
@@ -100,12 +95,9 @@
             11: { en: "Ram never left Hanuman's heart.", hi: "राम हनुमान के हृदय से कभी नहीं गए।" }
         };
 
-        // --- SCENE SETUP ---
         const scene = new THREE.Scene();
         scene.fog = new THREE.FogExp2(0x000000, 0.02); 
-        
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 500);
-        
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -114,11 +106,10 @@
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
-
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         scene.add(ambientLight);
 
-        // --- PARTICLES ---
+        // PARTICLES
         const particlesGeo = new THREE.BufferGeometry();
         const particlesCount = 4000;
         const posArray = new Float32Array(particlesCount * 3);
@@ -128,7 +119,7 @@
         const starField = new THREE.Points(particlesGeo, particlesMat);
         scene.add(starField);
 
-        // --- 3D PANELS ---
+        // PANELS
         const textureLoader = new THREE.TextureLoader();
         const panelPositions = []; 
         const PANEL_DISTANCE = 8.0; 
@@ -136,7 +127,6 @@
         function createPanel(index, zPos) {
             const group = new THREE.Group();
             group.position.set(0, 0, -zPos); 
-            
             ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
                 const zOffsets = [-0.5, -0.2, 0.2];
                 const scales = [5.5, 4.5, 3.5]; 
@@ -149,10 +139,7 @@
                         new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
                     );
                     mesh.position.z = zOffsets[i];
-                    
-                    // Stretched for Cinematic View
                     mesh.scale.set(scales[i] * 1.4, scales[i], 1);
-                    
                     group.add(mesh);
                 });
             });
@@ -161,41 +148,36 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 HUD COCKPIT (LOW & TILTED) ---
+        // --- 🔘 VISIBLE HUD 🔘 ---
         const hudGroup = new THREE.Group();
         camera.add(hudGroup);
-        // 🔥 LOWER POSITION (The "Dashboard")
-        // y=-0.9 (Down), z=-1.8 (Forward)
-        hudGroup.position.set(0, -0.9, -1.8);
-        // 🔥 TILTED UP to face eyes
-        hudGroup.rotation.x = -0.5; 
+        
+        // 🔥 RAISED HIGHER (y=-0.2) so it's in view
+        hudGroup.position.set(0, -0.2, -2.5); 
+        hudGroup.rotation.x = -0.2; // Slight tilt up
 
-        // START BUTTON (Dead Center, Straight Ahead)
+        // START BUTTON (Center, Same Z as HUD)
         const startGroup = new THREE.Group();
         camera.add(startGroup);
         startGroup.position.set(0, 0, -2.5); 
 
-        // SUBTITLE PLANE (Attached to HUD)
+        // SUBTITLE PLANE
         const subCanvas = document.createElement('canvas');
         subCanvas.width = 1024; subCanvas.height = 128;
         const subCtx = subCanvas.getContext('2d');
         const subTex = new THREE.CanvasTexture(subCanvas);
         const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true });
-        const subGeo = new THREE.PlaneGeometry(2.5, 0.3);
+        const subGeo = new THREE.PlaneGeometry(3.0, 0.4);
         const subMesh = new THREE.Mesh(subGeo, subMat);
-        subMesh.position.y = 0.4; // Sits ON TOP of the dashboard buttons
+        subMesh.position.y = -0.5; // Below buttons
         hudGroup.add(subMesh);
 
         function updateSubtitle(text) {
             subCtx.clearRect(0,0,1024,128);
             if(!text) { subTex.needsUpdate = true; return; }
-            
-            // Background
             subCtx.fillStyle = "rgba(0,0,0,0.6)";
-            subCtx.roundRect(100, 10, 824, 108, 20);
+            subCtx.roundRect(50, 10, 924, 108, 20);
             subCtx.fill();
-            
-            // Text
             subCtx.fillStyle = "#FFD700";
             subCtx.font = "bold 40px Arial";
             subCtx.textAlign = "center";
@@ -210,14 +192,12 @@
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
-            
             const tex = new THREE.CanvasTexture(canvas);
             const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-            const geo = new THREE.PlaneGeometry(0.3, 0.3);
+            const geo = new THREE.PlaneGeometry(0.35, 0.35); // Nice size
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
             mesh.userData = { type: name };
-            
             parentGroup.add(mesh);
             buttons[name] = { mesh, ctx, tex, color, canvas };
             drawButton(name, name); 
@@ -228,35 +208,29 @@
             const btn = buttons[name];
             const ctx = btn.ctx;
             ctx.clearRect(0,0,256,256);
-            
-            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.fillStyle = "rgba(0,0,0,0.9)"; 
             ctx.strokeStyle = btn.color;
             ctx.lineWidth = 15;
             ctx.beginPath();
             ctx.arc(128, 128, 110, 0, Math.PI*2);
             ctx.fill();
             ctx.stroke();
-            
             ctx.fillStyle = btn.color;
             ctx.font = "bold 60px Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(label, 128, 128);
-            
             btn.tex.needsUpdate = true;
         }
 
-        // --- BUTTON LAYOUT (DASHBOARD) ---
-        // [<<]  [PLAY]  [1x]
-        createButton("REWIND", -0.4, "#FFFFFF", hudGroup);
+        createButton("REWIND", -0.5, "#FFFFFF", hudGroup);
         createButton("PLAY", 0, "#FFD700", hudGroup);
-        createButton("SPEED", 0.4, "#00FF00", hudGroup);
+        createButton("SPEED", 0.5, "#00FF00", hudGroup);
 
-        // START BUTTON (Center View)
         const btnStart = createButton("START", 0, "#00FF00", startGroup);
-        btnStart.scale.set(2.0, 2.0, 2.0); // HUGE
-        
-        // --- LOGIC ---
+        btnStart.scale.set(2.5, 2.5, 2.5); // MASSIVE START BUTTON
+
+        // LOGIC
         const raycaster = new THREE.Raycaster();
         const center = new THREE.Vector2(0, 0);
         let lookTimer = 0;
@@ -268,33 +242,21 @@
 
         function updateGaze(dt) {
             raycaster.setFromCamera(center, camera);
-            
             const targets = [...hudGroup.children, ...startGroup.children];
             const intersects = raycaster.intersectObjects(targets);
-
             const retL = document.getElementById('reticle-left');
             const retR = document.getElementById('reticle-right');
 
             if (intersects.length > 0 && intersects[0].object.visible) {
                 const hit = intersects[0].object;
-                
                 retL.classList.add('active'); retR.classList.add('active');
-
-                if (activeBtn !== hit) {
-                    activeBtn = hit;
-                    lookTimer = 0;
-                } else {
+                if (activeBtn !== hit) { activeBtn = hit; lookTimer = 0; } 
+                else {
                     lookTimer += dt;
                     const triggerTime = (hit.userData.type === "START") ? 2.0 : 1.2;
-
                     if (lookTimer > triggerTime) { 
                         const type = hit.userData.type;
-                        
-                        // ACTION
-                        if (type === "START") {
-                            hasStarted = true; isPlaying = true;
-                            startGroup.visible = false; // HIDE START BUTTON
-                        } 
+                        if (type === "START") { hasStarted = true; isPlaying = true; startGroup.visible = false; } 
                         else if (type === "PLAY" || type === "PAUSE") {
                             isPlaying = !isPlaying;
                             drawButton("PLAY", isPlaying ? "PAUSE" : "PLAY");
@@ -307,17 +269,10 @@
                             drawButton("SPEED", speedMultiplier + "x");
                         }
                         else if (type === "REWIND") {
-                            moveDirection = -1; // Reverse
-                            isPlaying = true;
+                            moveDirection = -1; isPlaying = true;
                             drawButton("REWIND", "<<");
-                            setTimeout(() => { 
-                                moveDirection = 1; 
-                                isPlaying = false; 
-                                drawButton("PLAY", "PLAY"); 
-                                buttons["PLAY"].mesh.userData.type = "PLAY";
-                            }, 2000); 
+                            setTimeout(() => { moveDirection = 1; isPlaying = false; drawButton("PLAY", "PLAY"); buttons["PLAY"].mesh.userData.type = "PLAY"; }, 2000); 
                         }
-
                         retL.classList.remove('active'); retR.classList.remove('active');
                         retL.classList.add('clicked'); retR.classList.add('clicked');
                         lookTimer = 0; 
@@ -330,13 +285,11 @@
             }
         }
 
-        // --- AUDIO ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
         const audioLoader = new THREE.AudioLoader();
         const panelAudios = {}; 
         const audioPanels = [1,2,3,4,6,7,8,9,10,11];
-
         audioPanels.forEach(i => {
             const sound = new THREE.Audio(listener);
             audioLoader.load(`assets/audio/panel${i}_${currentLang}.mp3`, (buffer) => {
@@ -345,18 +298,14 @@
             });
         });
 
-        // --- START DOM ---
         let controls = null;
         const startBtnDOM = document.getElementById('start-btn');
         const overlay = document.getElementById('overlay');
-
         startBtnDOM.addEventListener('click', () => {
             const music = document.getElementById('bg-music');
             if(music) music.play();
-
             let countdown = 10;
             startBtnDOM.disabled = true;
-            
             const timer = setInterval(() => {
                 startBtnDOM.innerText = `PUT IN HEADSET... ${countdown}`;
                 countdown--;
@@ -364,7 +313,6 @@
                     clearInterval(timer);
                     overlay.style.opacity = '0';
                     setTimeout(() => { overlay.style.display = 'none'; }, 1000);
-                    
                     controls = new THREE.DeviceOrientationControls(camera);
                     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                         try { DeviceOrientationEvent.requestPermission(); } catch(e){}
@@ -376,62 +324,50 @@
         let currentActivePanel = -1;
         function checkProximity() {
             const camPos = new THREE.Vector3(0,0,0);
-            let closestPanel = -1;
-            let closestDist = 9999;
+            let closestPanel = -1; let closestDist = 9999;
             panelPositions.forEach(p => {
                 const panelWorldPos = new THREE.Vector3(0, 0, p.z);
                 panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
                 const dist = camPos.distanceTo(panelWorldPos);
                 if (dist < 6.0) { if (dist < closestDist) { closestDist = dist; closestPanel = p.id; } }
             });
-            
             if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
                 if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) panelAudios[currentActivePanel].stop();
                 if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
-                
-                // UPDATE 3D SUBTITLES
                 const text = STORY_DATA[closestPanel] ? STORY_DATA[closestPanel][currentLang] : "";
                 updateSubtitle(text);
-                
                 currentActivePanel = closestPanel;
             }
         }
 
         const clock = new THREE.Clock();
         const eyeSep = 0.06;
-
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
             if(controls) controls.update();
-
-            // MOVEMENT
+            
+            // 🔥 SPEED UP (0.04)
             if (isPlaying && hasStarted) {
-                const baseSpeed = 0.005; 
+                const baseSpeed = 0.04; 
                 worldGroup.position.z += (baseSpeed * speedMultiplier * moveDirection);
             }
-
             starField.rotation.y += 0.0005;
             updateGaze(dt);
             checkProximity();
 
             const w = window.innerWidth, h = window.innerHeight;
             renderer.setScissorTest(true);
-
-            // Left
             renderer.setScissor(0, 0, w/2, h);
             renderer.setViewport(0, 0, w/2, h);
             camera.position.x = -eyeSep/2;
             renderer.render(scene, camera);
-
-            // Right
             renderer.setScissor(w/2, 0, w/2, h);
             renderer.setViewport(w/2, 0, w/2, h);
             camera.position.x = eyeSep/2;
             renderer.render(scene, camera);
         }
         animate();
-        
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();

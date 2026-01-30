@@ -4,69 +4,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Truth - Scroll Mode</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Rozha+One&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
     <style>
         body { 
             margin: 0; 
             background-color: #050505; 
-            font-family: 'Cinzel', serif; 
-            color: #FFD700;
-            overflow-x: hidden;
-        }
-
-        /* CONTAINER */
-        .story-container {
+            overflow-x: hidden; 
             display: flex;
             flex-direction: column;
-            align-items: center;
-            width: 100%;
+            align-items: center; /* Centers the content on Desktop */
         }
 
-        /* PANEL STYLING */
+        /* The Frame for the Art */
         .panel {
             position: relative;
             width: 100%;
-            height: 100vh; /* Full viewport height */
+            height: 100vh; /* Default to full screen height */
             display: flex;
             justify-content: center;
             align-items: center;
-            scroll-snap-align: start;
+            overflow: hidden;
+            border-bottom: 1px solid #222;
         }
 
-        /* IMAGE HANDLING - THE FIX */
-        .panel img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain; /* 🔥 ENSURES NO CROPPING ON MOBILE */
-            display: block;
+        /* THE LAYER FIX */
+        .layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover; /* Default for Desktop (Fills the box) */
         }
-        
-        /* DESKTOP TWEAK: Keep it cleaner on wide screens */
-        @media (min-width: 768px) {
-            .panel img {
-                object-fit: cover; /* On desktop, full bleed looks better */
-                max-width: 800px;  /* Limit width so it doesn't get too tall */
-                margin: 0 auto;
-                height: auto;
-                border: 1px solid #333;
+
+        /* --- 📱 MOBILE OPTIMIZATION --- */
+        @media (max-width: 768px) {
+            .layer {
+                object-fit: contain; /* Ensures FULL art is seen on phone */
             }
-            .panel { height: auto; padding: 50px 0; }
+            .panel {
+                height: 100vh; /* Force full height on mobile */
+                background: #000; /* Black bars if ratio differs */
+            }
         }
 
-        /* AUDIO PLAYER */
-        #audio-controls {
-            position: fixed; bottom: 20px; right: 20px;
-            background: rgba(0,0,0,0.7); border: 1px solid #FFD700;
-            padding: 10px; border-radius: 50%; width: 50px; height: 50px;
-            display: flex; justify-content: center; align-items: center;
-            cursor: pointer; z-index: 100;
+        /* --- 🖥️ DESKTOP OPTIMIZATION --- */
+        @media (min-width: 769px) {
+            .panel {
+                width: 100%; 
+                max-width: 600px; /* Limits width so it doesn't stretch weirdly */
+                height: 90vh; /* Slightly smaller than full screen for scroll feel */
+                margin: 20px 0;
+                box-shadow: 0 0 50px rgba(255, 215, 0, 0.1);
+            }
+            .layer {
+                object-fit: cover; 
+            }
         }
 
-        /* HOME BUTTON */
         #home-btn {
-            position: fixed; top: 20px; left: 20px;
+            position: fixed; top: 20px; left: 20px; z-index: 100;
             background: rgba(0,0,0,0.6); padding: 10px; border-radius: 50%;
-            border: 1px solid rgba(255,215,0,0.3); z-index: 100;
+            border: 1px solid #FFD700; cursor: pointer;
         }
     </style>
 </head>
@@ -76,26 +73,29 @@
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
     </a>
 
-    <div class="story-container">
-        <div class="panel"><img src="assets/panels/panel1_fg.png" alt="Panel 1"></div>
-        <div class="panel"><img src="assets/panels/panel2_fg.png" alt="Panel 2"></div>
-        <div class="panel"><img src="assets/panels/panel3_fg.png" alt="Panel 3"></div>
-        <div class="panel"><img src="assets/panels/panel4_fg.png" alt="Panel 4"></div>
-        <div class="panel"><img src="assets/panels/panel6_fg.png" alt="Panel 6"></div>
-        <div class="panel"><img src="assets/panels/panel7_fg.png" alt="Panel 7"></div>
-        <div class="panel"><img src="assets/panels/panel8_fg.png" alt="Panel 8"></div>
-        <div class="panel"><img src="assets/panels/panel9_fg.png" alt="Panel 9"></div>
-        <div class="panel"><img src="assets/panels/panel10_fg.png" alt="Panel 10"></div>
-        <div class="panel"><img src="assets/panels/panel11_fg.png" alt="Panel 11"></div>
-    </div>
+    <div id="container">
+        </div>
 
     <script>
-        // Simple Audio Logic for Web Mode
-        const urlParams = new URLSearchParams(window.location.search);
-        const lang = urlParams.get('lang') || 'en';
-        
-        // You can add scroll-based audio triggering here if desired
-        // For now, it's a visual scroll experience
+        const container = document.getElementById('container');
+        const TOTAL_PANELS = 11;
+
+        for (let i = 1; i <= TOTAL_PANELS; i++) {
+            if (i === 5) continue; // Skip empty panel
+
+            const panelDiv = document.createElement('div');
+            panelDiv.className = 'panel';
+            
+            // Stack Layers: BG -> MID -> FG
+            ['bg', 'mid', 'fg'].forEach(layer => {
+                const img = document.createElement('img');
+                img.src = `assets/panels/panel${i}_${layer}.png`;
+                img.className = `layer ${layer}`;
+                panelDiv.appendChild(img);
+            });
+
+            container.appendChild(panelDiv);
+        }
     </script>
 </body>
 </html>
