@@ -8,36 +8,35 @@
     <style>
         body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Cinzel', serif; }
         
-        /* START OVERLAY */
+        /* OVERLAY */
         #overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); display: flex; flex-direction: column;
+            background: rgba(0,0,0,0.95); display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
             text-align: center; color: #FFD700;
         }
+        
         button {
             padding: 15px 30px; font-size: 1.2rem; background: #FFD700; color: #000;
             border: none; border-radius: 5px; margin-top: 20px; font-family: 'Cinzel', serif;
-            cursor: pointer;
+            cursor: pointer; transition: transform 0.2s;
         }
+        button:active { transform: scale(0.95); background: #fff; }
         
-        /* HOME BUTTON */
+        /* DEBUG CONSOLE (To see errors on phone) */
+        #debug-console {
+            position: absolute; top: 0; left: 0; width: 100%; 
+            color: #ff4444; font-family: monospace; font-size: 12px;
+            background: rgba(0,0,0,0.8); pointer-events: none; z-index: 200;
+            padding: 10px; box-sizing: border-box; text-align: left;
+            white-space: pre-wrap;
+        }
+
         #home-btn {
             position: absolute; top: 20px; left: 20px; z-index: 50;
             background: rgba(0,0,0,0.5); padding: 10px; border-radius: 50%;
             border: 1px solid #FFD700; display: flex;
         }
-
-        /* SUBTITLES */
-        #subtitle-container {
-            position: absolute; bottom: 20%; width: 100%; text-align: center; pointer-events: none; z-index: 10;
-        }
-        #subtitle-text {
-            color: #FFD700; font-size: 1.2rem; background: rgba(0,0,0,0.5); 
-            padding: 10px 20px; border-radius: 10px; display: inline-block;
-            opacity: 0; transition: opacity 0.5s;
-        }
-        #subtitle-text.visible { opacity: 1; }
     </style>
 
     <script type="importmap">
@@ -51,23 +50,48 @@
 </head>
 <body>
 
+    <div id="debug-console"></div>
+
     <a href="index.html" id="home-btn">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
     </a>
 
     <div id="overlay">
         <h1>ENTER THE VOID</h1>
-        <p>Put your phone in a VR Headset (Cardboard)</p>
+        <p>Put your phone in a VR Headset</p>
         <button id="start-btn">START VR</button>
+        <p id="status-text" style="font-size: 0.8rem; color: #666; margin-top: 20px;">Initializing...</p>
     </div>
-
-    <div id="subtitle-container"><div id="subtitle-text"></div></div>
 
     <audio id="bg-music" loop><source src="assets/audio/bgmusic.mp3" type="audio/mpeg"></audio>
 
+    <script>
+        // --- ERROR TRAP ---
+        // This catches errors and prints them to the screen so you can see them!
+        window.onerror = function(msg, url, line) {
+            const log = document.getElementById('debug-console');
+            log.innerHTML += `❌ ERROR: ${msg}\nLine: ${line}\n`;
+            document.getElementById('status-text').innerText = "System Error. Check top left.";
+            document.getElementById('status-text').style.color = "red";
+            return false;
+        };
+        
+        function log(msg) {
+            console.log(msg);
+            // Uncomment next line to see ALL logs on screen (spammy)
+            // document.getElementById('debug-console').innerHTML += `ℹ️ ${msg}\n`;
+        }
+    </script>
+
     <script type="module">
+        log("Module script started...");
+        
         import * as THREE from 'three';
         import { DeviceOrientationControls } from 'three/addons/controls/DeviceOrientationControls.js';
+
+        // If we got here, imports worked!
+        document.getElementById('status-text').innerText = "System Ready. Press Start.";
+        document.getElementById('status-text').style.color = "#0f0";
 
         // SETUP
         const urlParams = new URLSearchParams(window.location.search);
@@ -80,98 +104,98 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // GROUP
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
 
-        // LIGHTS
         const light = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
         scene.add(light);
 
-        // CONTROLS
-        let controls;
+        let controls = null;
 
-        // --- LOAD CONTENT (PANELS) ---
+        // --- LOAD CONTENT ---
         const textureLoader = new THREE.TextureLoader();
-        const panelPositions = [];
         const PANEL_DISTANCE = 1.5;
 
         function createPanel(index, zPos) {
             const group = new THREE.Group();
             group.position.set(0, 0, -zPos);
             
-            ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
-                const zOffsets = [-0.3, -0.1, 0.1];
-                const scales = [1.5, 1.2, 1.0];
-                
-                textureLoader.load(`assets/panels/panel${index}${suffix}`, (tex) => {
+            const layers = [
+                { suffix: '_bg.png', z: -0.3, scale: 1.5 },
+                { suffix: '_mid.png', z: -0.1, scale: 1.2 },
+                { suffix: '_fg.png', z: 0.1, scale: 1.0 }
+            ];
+
+            layers.forEach(layer => {
+                const path = `assets/panels/panel${index}${layer.suffix}`;
+                textureLoader.load(path, (tex) => {
                     tex.colorSpace = THREE.SRGBColorSpace;
                     const aspect = tex.image.width / tex.image.height;
                     const mesh = new THREE.Mesh(
                         new THREE.PlaneGeometry(aspect, 1),
                         new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
                     );
-                    mesh.position.z = zOffsets[i];
-                    mesh.scale.set(scales[i], scales[i], 1);
+                    mesh.position.z = layer.z;
+                    mesh.scale.set(layer.scale, layer.scale, 1);
                     group.add(mesh);
+                }, undefined, (err) => {
+                    log(`Error loading texture: ${path}`);
                 });
             });
             worldGroup.add(group);
-            panelPositions.push({ id: index, z: -zPos });
         }
 
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- AUDIO ---
-        const listener = new THREE.AudioListener();
-        camera.add(listener);
-        const panelAudios = {};
-        const audioLoader = new THREE.AudioLoader();
-
-        [1,2,3,4,6,7,8,9,10,11].forEach(i => {
-            const sound = new THREE.Audio(listener);
-            audioLoader.load(`assets/audio/panel${i}_${currentLang}.mp3`, (buffer) => {
-                sound.setBuffer(buffer);
-                panelAudios[i] = sound;
-            });
-        });
-
-        // --- START LOGIC ---
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('bg-music').play();
-
-            // INIT CONTROLS
-            controls = new DeviceOrientationControls(camera);
+        // --- BUTTON LOGIC ---
+        const startBtn = document.getElementById('start-btn');
+        
+        startBtn.addEventListener('click', async () => {
+            log("Start button clicked...");
+            startBtn.innerText = "Loading...";
             
-            // iOS PERMISSION
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
+            try {
+                // 1. Audio
+                const music = document.getElementById('bg-music');
+                if(music) music.play().catch(e => log("Audio play warning: " + e));
+
+                // 2. Hide Overlay
+                document.getElementById('overlay').style.display = 'none';
+
+                // 3. Init Controls
+                controls = new DeviceOrientationControls(camera);
+                
+                // 4. iOS Permission
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    log("Requesting iOS permission...");
                     const response = await DeviceOrientationEvent.requestPermission();
-                    if (response === 'granted') controls.connect();
-                    else alert("Permission denied. VR requires orientation.");
-                } catch (e) { console.error(e); }
-            } else {
-                controls.connect();
+                    if (response === 'granted') {
+                        controls.connect();
+                        log("iOS Permission Granted");
+                    } else {
+                        alert("Permission denied. You cannot look around in VR.");
+                    }
+                } else {
+                    controls.connect();
+                    log("Controls connected (Android/Desktop)");
+                }
+
+            } catch(e) {
+                alert("Critical VR Error: " + e.message);
+                document.getElementById('debug-console').innerHTML += `❌ CRASH: ${e.message}`;
             }
         });
 
-        // --- RENDER LOOP (SPLIT SCREEN) ---
+        // --- RENDER LOOP ---
         const eyeSep = 0.06;
         
         function animate() {
             requestAnimationFrame(animate);
             if(controls) controls.update();
 
-            // PROXIMITY CHECK (Simplified)
-            // In VR, we auto-move the world slowly towards the user or just look around?
-            // For now, let's keep it static so they can look around, or add auto-scroll:
-            worldGroup.position.z += 0.002; // Slow auto-walk forward
+            // Auto-move forward slowly
+            worldGroup.position.z += 0.002; 
 
-            // Check Audio Trigger
-            // ... (Audio logic similar to AR but simpler) ...
-
-            // RENDER
             const w = window.innerWidth, h = window.innerHeight;
             renderer.setScissorTest(true);
 
@@ -188,6 +212,7 @@
             renderer.render(scene, camera);
         }
         animate();
+        log("Render loop started.");
     </script>
 </body>
 </html>
