@@ -22,25 +22,19 @@
             cursor: pointer;
         }
 
-        /* RETICLE (THE CURSOR) */
-        /* We make two cursors for VR split screen (Left/Right) */
+        /* RETICLE (Cursors) */
         .reticle {
             position: absolute; top: 50%; width: 20px; height: 20px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
             transform: translate(-50%, -50%); pointer-events: none;
             box-shadow: 0 0 10px white; transition: transform 0.2s, background 0.2s;
         }
-        /* Left Eye Center */
+        .reticle.active { background: #FFD700; transform: translate(-50%, -50%) scale(0.5); }
+        
+        /* Split Screen Positions */
         #reticle-left { left: 25%; } 
-        /* Right Eye Center */
         #reticle-right { left: 75%; }
         
-        /* Loading Animation for Gaze */
-        .reticle.active {
-            background: #FFD700;
-            transform: translate(-50%, -50%) scale(0.5);
-        }
-
         /* LANDSCAPE WARNING */
         #landscape-alert {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -63,7 +57,7 @@
 
     <div id="overlay">
         <h1>CARDBOARD AR</h1>
-        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look at buttons to move</p>
+        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look down to move</p>
         <button id="start-btn">START EXPERIENCE</button>
     </div>
 
@@ -84,32 +78,35 @@
         
         // SETUP
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 500);
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.outputEncoding = THREE.sRGBEncoding; // 🔥 FIX FOR DARK COLORS
+        renderer.setPixelRatio(window.devicePixelRatio); // 🔥 SHARP TEXT FIX
+        renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
 
-        // LIGHTS
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); // 🔥 BRIGHTER LIGHT
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
         scene.add(ambientLight);
 
-        // --- CAMERA BACKGROUND ---
+        // --- 🎥 CAMERA BACKGROUND (THE SKYBOX FIX) ---
         const video = document.getElementById('video-source');
         const videoTexture = new THREE.VideoTexture(video);
         videoTexture.minFilter = THREE.LinearFilter;
         videoTexture.magFilter = THREE.LinearFilter;
-        videoTexture.format = THREE.RGBFormat;
-
-        const camBgGeo = new THREE.PlaneGeometry(20, 12); 
-        const camBgMat = new THREE.MeshBasicMaterial({ map: videoTexture, depthTest: false, depthWrite: false });
-        const camBgMesh = new THREE.Mesh(camBgGeo, camBgMat);
-        camBgMesh.position.z = -10; 
-        camera.add(camBgMesh); 
+        
+        // GIANT SPHERE instead of plane = Full Surround Vision
+        const camGeo = new THREE.SphereGeometry(200, 60, 40); 
+        // Invert sphere so we see the inside
+        camGeo.scale(-1, 1, 1); 
+        const camMat = new THREE.MeshBasicMaterial({ map: videoTexture });
+        const camMesh = new THREE.Mesh(camGeo, camMat);
+        
+        // Attach to camera so it follows you everywhere
+        camera.add(camMesh);
         scene.add(camera);
 
         // --- 3D PANELS ---
@@ -143,47 +140,51 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 INTERACTIVE GAZE BUTTONS 🔘 ---
+        // --- 🔘 HIGH RES CONTROLS ---
         const buttonGroup = new THREE.Group();
-        camera.add(buttonGroup); // Buttons move with head (HUD)
-        buttonGroup.position.z = -2; // In front of face
-        buttonGroup.position.y = -0.8; // Slightly below view
+        scene.add(buttonGroup); // 🔥 DETACHED FROM CAMERA (Allows you to look at them)
 
         function createButton(name, x, color) {
-            // Text Canvas
+            // High Res Canvas
             const canvas = document.createElement('canvas');
-            canvas.width = 128; canvas.height = 64;
+            canvas.width = 512; canvas.height = 256; // 🔥 4X RESOLUTION
             const ctx = canvas.getContext('2d');
+            
             ctx.fillStyle = color;
-            ctx.fillRect(0,0,128,64);
+            ctx.fillRect(0,0,512,256);
             ctx.fillStyle = "black";
-            ctx.font = "bold 20px Arial";
+            ctx.font = "bold 80px Arial"; // Bigger Font
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(name, 64, 32);
+            ctx.fillText(name, 256, 128);
             
             const tex = new THREE.CanvasTexture(canvas);
             const mat = new THREE.MeshBasicMaterial({ map: tex });
             const geo = new THREE.PlaneGeometry(0.6, 0.3);
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
-            mesh.userData = { type: name }; // Tag for Raycaster
+            mesh.userData = { type: name };
             buttonGroup.add(mesh);
             return mesh;
         }
 
-        const btnPrev = createButton("PREV", -0.8, "#FFD700");
-        const btnReset = createButton("RESET", 0, "#FF4444");
-        const btnNext = createButton("NEXT", 0.8, "#00FF00");
+        createButton("PREV", -0.8, "#FFD700");
+        createButton("RESET", 0, "#FF4444");
+        createButton("NEXT", 0.8, "#00FF00");
 
-        // --- RAYCASTER (The Eyes) ---
+        // --- RAYCASTER ---
         const raycaster = new THREE.Raycaster();
-        const center = new THREE.Vector2(0, 0); // Center of screen
-        
+        const center = new THREE.Vector2(0, 0);
         let lookTimer = 0;
         let activeBtn = null;
         
         function updateGaze(dt) {
+            // Update buttons to follow camera position (but NOT rotation)
+            // This keeps them at your "chest" level
+            buttonGroup.position.z = camera.position.z - 2; 
+            buttonGroup.position.y = -1.2; // Look down
+            buttonGroup.position.x = camera.position.x; // Stay centered
+
             raycaster.setFromCamera(center, camera);
             const intersects = raycaster.intersectObjects(buttonGroup.children);
 
@@ -192,38 +193,28 @@
 
             if (intersects.length > 0) {
                 const hit = intersects[0].object;
-                
-                // Visual Feedback
-                retL.classList.add('active');
-                retR.classList.add('active');
+                retL.classList.add('active'); retR.classList.add('active');
 
                 if (activeBtn !== hit) {
                     activeBtn = hit;
-                    lookTimer = 0; // Reset timer on new look
+                    lookTimer = 0;
                 } else {
                     lookTimer += dt;
-                    // MOVEMENT LOGIC (Continuous if holding look)
                     if (hit.userData.type === "NEXT") {
-                        worldGroup.position.z += 0.03; // Slow Forward
+                        worldGroup.position.z += 0.03; 
                     } else if (hit.userData.type === "PREV") {
-                        worldGroup.position.z -= 0.03; // Slow Back
+                        worldGroup.position.z -= 0.03;
                     } else if (hit.userData.type === "RESET") {
-                        if (lookTimer > 1.0) { // Require 1s stare to reset
-                            worldGroup.position.z = 0;
-                            lookTimer = 0;
-                        }
+                        if (lookTimer > 1.0) { worldGroup.position.z = 0; lookTimer = 0; }
                     }
                 }
             } else {
-                retL.classList.remove('active');
-                retR.classList.remove('active');
-                activeBtn = null;
-                lookTimer = 0;
+                retL.classList.remove('active'); retR.classList.remove('active');
+                activeBtn = null; lookTimer = 0;
             }
         }
 
-
-        // --- AUDIO ---
+        // --- AUDIO & START ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
         const audioLoader = new THREE.AudioLoader();
@@ -238,7 +229,6 @@
             });
         });
 
-        // --- START BUTTON ---
         let controls = null;
         document.getElementById('start-btn').addEventListener('click', async () => {
             try {
@@ -251,7 +241,6 @@
 
             const music = document.getElementById('bg-music');
             if(music) music.play();
-            
             document.getElementById('overlay').style.display = 'none';
 
             controls = new THREE.DeviceOrientationControls(camera);
@@ -260,7 +249,6 @@
             }
         });
 
-        // --- AUDIO PROXIMITY ---
         let currentActivePanel = -1;
         function checkProximity() {
             const camPos = new THREE.Vector3(0,0,0);
@@ -285,19 +273,16 @@
             }
         }
 
-        // --- LOOP ---
+        // --- ANIMATION LOOP ---
         const clock = new THREE.Clock();
         const eyeSep = 0.06;
 
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
-
             if(controls) controls.update();
 
-            // 🔥 GAZE UPDATE 🔥
             updateGaze(dt);
-            
             checkProximity();
 
             const w = window.innerWidth, h = window.innerHeight;
