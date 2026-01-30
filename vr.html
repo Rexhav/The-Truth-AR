@@ -13,15 +13,22 @@
             background: #000; display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 100;
             text-align: center; color: #FFD700; padding: 20px;
+            transition: opacity 0.5s;
         }
         
+        /* COUNTDOWN TEXT */
+        #countdown-display {
+            font-size: 5rem; font-weight: bold; color: #FFD700; margin: 20px 0;
+            display: none; /* Hidden initially */
+        }
+
         button {
             padding: 15px 40px; font-size: 1.2rem; background: transparent; 
             color: #FFD700; border: 2px solid #FFD700; border-radius: 50px; 
             font-family: 'Cinzel', serif; cursor: pointer; transition: all 0.3s;
         }
-        button:hover { background: #FFD700; color: #000; box-shadow: 0 0 20px #FFD700; }
-        button:disabled { opacity: 0.5; border-color: #555; color: #555; }
+        button:hover { background: #FFD700; color: #000; }
+        button:disabled { border-color: #333; color: #555; pointer-events: none; }
 
         /* CURSORS */
         .reticle {
@@ -32,10 +39,9 @@
         }
         .reticle.active { 
             background: #FFD700; border-color: #FFD700;
-            transform: translate(-50%, -50%) scale(2.0); 
+            transform: translate(-50%, -50%) scale(2.5); /* Bigger reaction */
             transition: transform 1.5s linear; 
         }
-        .reticle.clicked { transform: translate(-50%, -50%) scale(1.0); transition: 0.1s; }
         
         #reticle-left { left: 25%; } 
         #reticle-right { left: 75%; }
@@ -59,12 +65,15 @@
 
     <div id="overlay">
         <h1>VR CINEMA MODE</h1>
-        <p style="color:#ccc; line-height:1.6;">
-            1. Press the button below.<br>
-            2. <strong>Wait 10s</strong> to put phone in headset.<br>
-            3. Inside VR, <strong>Look at START</strong> to begin.
-        </p>
-        <button id="start-btn">ENTER VR</button>
+        <div id="instruction-block">
+            <p style="color:#ccc; line-height:1.6;">
+                1. Press the button below.<br>
+                2. Put phone in headset <strong>immediately</strong>.<br>
+                3. Inside, <strong>Look at START</strong> to begin.
+            </p>
+            <button id="start-btn">START (10s TIMER)</button>
+        </div>
+        <div id="countdown-display">10</div>
     </div>
 
     <div id="reticle-left" class="reticle"></div>
@@ -148,28 +157,28 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 VISIBLE HUD 🔘 ---
+        // --- 🔘 VISIBLE HUD (MOVED BACK) 🔘 ---
         const hudGroup = new THREE.Group();
         camera.add(hudGroup);
         
-        // 🔥 RAISED HIGHER (y=-0.2) so it's in view
-        hudGroup.position.set(0, -0.2, -2.5); 
-        hudGroup.rotation.x = -0.2; // Slight tilt up
+        // 🔥 FIXED POSITION: y=-0.5 (Down), z=-4.0 (FAR BACK so it's visible)
+        // No Tilt: Facing straight at you
+        hudGroup.position.set(0, -0.5, -4.0); 
 
-        // START BUTTON (Center, Same Z as HUD)
+        // START BUTTON (Dead Center, Same Depth)
         const startGroup = new THREE.Group();
         camera.add(startGroup);
-        startGroup.position.set(0, 0, -2.5); 
+        startGroup.position.set(0, 0, -4.0); 
 
-        // SUBTITLE PLANE
+        // SUBTITLES
         const subCanvas = document.createElement('canvas');
         subCanvas.width = 1024; subCanvas.height = 128;
         const subCtx = subCanvas.getContext('2d');
         const subTex = new THREE.CanvasTexture(subCanvas);
         const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true });
-        const subGeo = new THREE.PlaneGeometry(3.0, 0.4);
+        const subGeo = new THREE.PlaneGeometry(4.0, 0.5); // Bigger for distance
         const subMesh = new THREE.Mesh(subGeo, subMat);
-        subMesh.position.y = -0.5; // Below buttons
+        subMesh.position.y = -0.8; // Below buttons
         hudGroup.add(subMesh);
 
         function updateSubtitle(text) {
@@ -194,7 +203,9 @@
             const ctx = canvas.getContext('2d');
             const tex = new THREE.CanvasTexture(canvas);
             const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-            const geo = new THREE.PlaneGeometry(0.35, 0.35); // Nice size
+            
+            // 🔥 BIGGER BUTTONS (0.6 size at 4m distance)
+            const geo = new THREE.PlaneGeometry(0.6, 0.6);
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
             mesh.userData = { type: name };
@@ -223,12 +234,13 @@
             btn.tex.needsUpdate = true;
         }
 
-        createButton("REWIND", -0.5, "#FFFFFF", hudGroup);
+        // Space out buttons more (x offsets increased)
+        createButton("REWIND", -0.8, "#FFFFFF", hudGroup);
         createButton("PLAY", 0, "#FFD700", hudGroup);
-        createButton("SPEED", 0.5, "#00FF00", hudGroup);
+        createButton("SPEED", 0.8, "#00FF00", hudGroup);
 
         const btnStart = createButton("START", 0, "#00FF00", startGroup);
-        btnStart.scale.set(2.5, 2.5, 2.5); // MASSIVE START BUTTON
+        btnStart.scale.set(3.0, 3.0, 3.0); // MASSIVE START BUTTON
 
         // LOGIC
         const raycaster = new THREE.Raycaster();
@@ -274,13 +286,11 @@
                             setTimeout(() => { moveDirection = 1; isPlaying = false; drawButton("PLAY", "PLAY"); buttons["PLAY"].mesh.userData.type = "PLAY"; }, 2000); 
                         }
                         retL.classList.remove('active'); retR.classList.remove('active');
-                        retL.classList.add('clicked'); retR.classList.add('clicked');
                         lookTimer = 0; 
                     }
                 }
             } else {
                 retL.classList.remove('active'); retR.classList.remove('active');
-                retL.classList.remove('clicked'); retR.classList.remove('clicked');
                 activeBtn = null; lookTimer = 0;
             }
         }
@@ -298,21 +308,32 @@
             });
         });
 
+        // --- START DOM LOGIC (Strict Timer) ---
         let controls = null;
         const startBtnDOM = document.getElementById('start-btn');
         const overlay = document.getElementById('overlay');
+        const instruction = document.getElementById('instruction-block');
+        const countdownDisplay = document.getElementById('countdown-display');
+
         startBtnDOM.addEventListener('click', () => {
             const music = document.getElementById('bg-music');
             if(music) music.play();
+
+            // Hide Instructions, Show Big Number
+            instruction.style.display = 'none';
+            countdownDisplay.style.display = 'block';
+
             let countdown = 10;
-            startBtnDOM.disabled = true;
             const timer = setInterval(() => {
-                startBtnDOM.innerText = `PUT IN HEADSET... ${countdown}`;
                 countdown--;
-                if (countdown < 0) {
+                countdownDisplay.innerText = countdown;
+                
+                if (countdown <= 0) {
                     clearInterval(timer);
                     overlay.style.opacity = '0';
-                    setTimeout(() => { overlay.style.display = 'none'; }, 1000);
+                    setTimeout(() => { overlay.style.display = 'none'; }, 500);
+                    
+                    // ONLY Init Controls AFTER 10s
                     controls = new THREE.DeviceOrientationControls(camera);
                     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                         try { DeviceOrientationEvent.requestPermission(); } catch(e){}
@@ -347,9 +368,9 @@
             const dt = clock.getDelta();
             if(controls) controls.update();
             
-            // 🔥 SPEED UP (0.04)
+            // 🔥 SPEED UP (0.004)
             if (isPlaying && hasStarted) {
-                const baseSpeed = 0.04; 
+                const baseSpeed = 0.004; 
                 worldGroup.position.z += (baseSpeed * speedMultiplier * moveDirection);
             }
             starField.rotation.y += 0.0005;

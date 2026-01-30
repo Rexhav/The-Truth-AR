@@ -10,56 +10,53 @@
             margin: 0; 
             background-color: #050505; 
             overflow-x: hidden; 
-            display: flex;
-            flex-direction: column;
-            align-items: center; /* Centers the content on Desktop */
         }
 
-        /* The Frame for the Art */
+        /* CONTAINER */
+        .story-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        /* PANEL (The Frame) */
         .panel {
             position: relative;
             width: 100%;
-            height: 100vh; /* Default to full screen height */
+            height: 100vh; /* Always full screen height */
             display: flex;
             justify-content: center;
             align-items: center;
             overflow: hidden;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid #111;
         }
 
-        /* THE LAYER FIX */
+        /* LAYERS (The Art) */
         .layer {
             position: absolute;
             top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover; /* Default for Desktop (Fills the box) */
+            width: 100%; 
+            height: 100%;
+            
+            /* --- DESKTOP DEFAULT (Old Code Style) --- */
+            object-fit: cover; /* Fills the screen, feels immersive */
+            object-position: center;
         }
 
-        /* --- 📱 MOBILE OPTIMIZATION --- */
+        /* --- 📱 PHONE SPECIFIC FIX --- */
         @media (max-width: 768px) {
             .layer {
-                object-fit: contain; /* Ensures FULL art is seen on phone */
+                /* This squeezes the art to fit the phone screen 
+                   so nothing gets cut off */
+                object-fit: contain; 
+                background-color: #000; /* Black bars for empty space */
             }
             .panel {
                 height: 100vh; /* Force full height on mobile */
-                background: #000; /* Black bars if ratio differs */
             }
         }
 
-        /* --- 🖥️ DESKTOP OPTIMIZATION --- */
-        @media (min-width: 769px) {
-            .panel {
-                width: 100%; 
-                max-width: 600px; /* Limits width so it doesn't stretch weirdly */
-                height: 90vh; /* Slightly smaller than full screen for scroll feel */
-                margin: 20px 0;
-                box-shadow: 0 0 50px rgba(255, 215, 0, 0.1);
-            }
-            .layer {
-                object-fit: cover; 
-            }
-        }
-
+        /* HOME BUTTON */
         #home-btn {
             position: fixed; top: 20px; left: 20px; z-index: 100;
             background: rgba(0,0,0,0.6); padding: 10px; border-radius: 50%;
@@ -73,7 +70,7 @@
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#FFD700" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
     </a>
 
-    <div id="container">
+    <div class="story-container" id="container">
         </div>
 
     <script>
