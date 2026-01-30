@@ -22,8 +22,8 @@
 
         button {
             padding: 20px 50px; font-size: 1.5rem; background: #FFD700; 
-            color: #000; border: none; border-radius: 50px; font-weight: bold;
-            font-family: 'Cinzel', serif; cursor: pointer;
+            color: #000; border: none; border-radius: 5px; font-weight: bold;
+            font-family: 'Cinzel', serif; cursor: pointer; text-transform: uppercase;
         }
         button:disabled { background: #333; color: #555; pointer-events: none; }
 
@@ -35,11 +35,10 @@
             box-shadow: 0 0 4px white;
             transition: all 0.2s;
         }
-        /* Active State: Turns Gold & Grows */
         .reticle.active { 
             background: #FFD700; 
             border-color: #FFD700;
-            transform: translate(-50%, -50%) scale(2.0);
+            transform: translate(-50%, -50%) scale(1.5);
         }
         
         #reticle-left { left: 25%; } 
@@ -92,7 +91,9 @@
         let lookTimer = 0;
         let activeBtn = null;
         
-        // 🔥 CLICKABLE LIST (Only buttons go here)
+        // Interaction Lock (Prevents double clicks)
+        let interactionLock = false; 
+
         const interactables = []; 
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -162,45 +163,48 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 COCKPIT UI (LOWERED & FIXED) 🔘 ---
+        // --- 🔘 COCKPIT UI (LOWERED) 🔘 ---
         const hudGroup = new THREE.Group();
         scene.add(hudGroup);
         
-        // 🔥 LOWERED: y = -1.2 (Lap Level) | TILTED: -0.5 (Dashboard)
-        hudGroup.position.set(0, -1.2, -2.5);
+        // 🔥 LOWERED: y = -1.6 (Deep Lap Level)
+        hudGroup.position.set(0, -1.6, -2.5);
         hudGroup.rotation.x = -0.5; 
 
-        // START BUTTON GROUP
         const startGroup = new THREE.Group();
         scene.add(startGroup);
         startGroup.position.set(0, -0.5, -2.5);
         startGroup.rotation.x = -0.2;
 
-        // SUBTITLES (NOT CLICKABLE)
-        const subCanvas = document.createElement('canvas');
-        subCanvas.width = 1024; subCanvas.height = 128;
-        const subCtx = subCanvas.getContext('2d');
-        const subTex = new THREE.CanvasTexture(subCanvas);
-        const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true, depthTest: false }); 
-        const subGeo = new THREE.PlaneGeometry(2.5, 0.3);
-        const subMesh = new THREE.Mesh(subGeo, subMat);
-        subMesh.position.y = 0.5; // Above buttons
-        // NOTE: We do NOT add subMesh to 'interactables' array.
-        hudGroup.add(subMesh);
+        // --- 📝 FEEDBACK TEXT (Small, Above Buttons) ---
+        const fbCanvas = document.createElement('canvas');
+        fbCanvas.width = 512; fbCanvas.height = 64;
+        const fbCtx = fbCanvas.getContext('2d');
+        const fbTex = new THREE.CanvasTexture(fbCanvas);
+        const fbMat = new THREE.MeshBasicMaterial({ map: fbTex, transparent: true, depthTest: false }); 
+        const fbGeo = new THREE.PlaneGeometry(1.5, 0.2);
+        const fbMesh = new THREE.Mesh(fbGeo, fbMat);
+        fbMesh.position.y = 0.6; // Floating above square buttons
+        hudGroup.add(fbMesh);
 
-        function updateSubtitle(text) {
-            subCtx.clearRect(0,0,1024,128);
-            if(!text) { subTex.needsUpdate = true; return; }
-            subCtx.fillStyle = "rgba(0,0,0,0.8)";
-            subCtx.roundRect(50, 10, 924, 108, 20);
-            subCtx.fill();
-            subCtx.fillStyle = "#FFD700";
-            subCtx.font = "bold 40px Arial";
-            subCtx.textAlign = "center";
-            subCtx.textBaseline = "middle";
-            subCtx.fillText(text, 512, 64);
-            subTex.needsUpdate = true;
+        let feedbackTimer = null;
+        function showFeedback(text) {
+            fbCtx.clearRect(0,0,512,64);
+            fbCtx.fillStyle = "rgba(0,0,0,0.8)";
+            fbCtx.roundRect(10, 0, 492, 64, 10);
+            fbCtx.fill();
+            fbCtx.fillStyle = "#00FF00"; // Bright Green Text
+            fbCtx.font = "bold 30px Arial";
+            fbCtx.textAlign = "center";
+            fbCtx.textBaseline = "middle";
+            fbCtx.fillText(text, 256, 32);
+            fbTex.needsUpdate = true;
+            fbMesh.visible = true;
+
+            if(feedbackTimer) clearTimeout(feedbackTimer);
+            feedbackTimer = setTimeout(() => { fbMesh.visible = false; }, 2000);
         }
+        fbMesh.visible = false; // Hidden initially
 
         const buttons = {};
 
@@ -211,8 +215,8 @@
             const tex = new THREE.CanvasTexture(canvas);
             const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }); 
             
-            // Increased Hitbox Size for easier clicking
-            const geo = new THREE.PlaneGeometry(0.6, 0.6); 
+            // 🔥 SQUARE SHAPE (PlaneGeometry is already square)
+            const geo = new THREE.PlaneGeometry(0.5, 0.5); 
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
             mesh.userData = { type: name };
@@ -220,8 +224,6 @@
             parentGroup.add(mesh);
             buttons[name] = { mesh, ctx, tex, canvas };
             drawButton(name, name, false); 
-            
-            // 🔥 ADD TO INTERACTABLES LIST
             interactables.push(mesh);
             return mesh;
         }
@@ -231,13 +233,14 @@
             const ctx = btn.ctx;
             ctx.clearRect(0,0,256,256);
             
-            // Background (Black Glass)
-            ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; 
-            ctx.strokeStyle = isHovered ? "#FFFFFF" : "#FFD700"; // White on Hover
+            // SQUARE BACKGROUND
+            ctx.fillStyle = isHovered ? "rgba(20, 20, 20, 0.95)" : "rgba(0, 0, 0, 0.9)"; 
+            ctx.strokeStyle = isHovered ? "#FFFFFF" : "#FFD700"; 
             ctx.lineWidth = 15;
             
+            // Draw Square with rounded corners
             ctx.beginPath();
-            ctx.arc(128, 128, 110, 0, Math.PI*2);
+            ctx.roundRect(10, 10, 236, 236, 40);
             ctx.fill();
             ctx.stroke();
             
@@ -251,10 +254,9 @@
             btn.tex.needsUpdate = true;
         }
 
-        // Layout: Spread out to avoid overlap
-        createButton("REWIND", -0.8, hudGroup);
+        createButton("REWIND", -0.7, hudGroup);
         createButton("PLAY", 0, hudGroup);
-        createButton("SPEED", 0.8, hudGroup);
+        createButton("SPEED", 0.7, hudGroup);
 
         const btnStart = createButton("START", 0, startGroup);
         btnStart.scale.set(1.5, 1.5, 1.5);
@@ -264,13 +266,10 @@
         const center = new THREE.Vector2(0, 0);
 
         function updateGaze(dt) {
-            if (!isVRActive) return;
+            if (!isVRActive || interactionLock) return; // 🔥 LOCK INTERACTION AFTER CLICK
 
             raycaster.setFromCamera(center, camera);
-            
-            // 🔥 FIXED: ONLY CHECK BUTTONS, NOT TEXT
             const intersects = raycaster.intersectObjects(interactables);
-            
             const retL = document.getElementById('reticle-left');
             const retR = document.getElementById('reticle-right');
 
@@ -287,44 +286,59 @@
                 } 
                 else {
                     lookTimer += dt;
-                    const triggerTime = (hit.userData.type === "START") ? 2.5 : 1.5;
+                    const triggerTime = (hit.userData.type === "START") ? 2.5 : 1.2;
                     
                     if (lookTimer > triggerTime) { 
                         const type = hit.userData.type;
                         
+                        // 🔥 LOCK TO PREVENT DOUBLE CLICK
+                        interactionLock = true;
+                        setTimeout(() => { interactionLock = false; activeBtn = null; }, 2000); 
+
                         // ACTIONS
                         if (type === "START") { 
                             hasStarted = true; isPlaying = true; 
                             startGroup.visible = false; 
-                            // Remove Start button from raycaster
                             const idx = interactables.indexOf(btnStart);
                             if(idx > -1) interactables.splice(idx, 1);
+                            showFeedback("JOURNEY STARTED");
                         } 
-                        else if (type === "PLAY" || type === "PAUSE") {
-                            isPlaying = !isPlaying;
-                            drawButton("PLAY", isPlaying ? "PAUSE" : "PLAY", true);
-                            buttons["PLAY"].mesh.userData.type = isPlaying ? "PAUSE" : "PLAY";
-                        } 
+                        else if (type === "PLAY") {
+                            // TOGGLE LOGIC
+                            if(isPlaying) {
+                                isPlaying = false;
+                                showFeedback("PAUSED");
+                                drawButton("PLAY", "PAUSED", true); // Show "PAUSED" on button
+                                buttons["PLAY"].mesh.userData.type = "PLAY"; // Keep ID same
+                            } else {
+                                isPlaying = true;
+                                showFeedback("PLAYING");
+                                drawButton("PLAY", "PLAY", true);
+                            }
+                        }
+                        // Note: For simplicity, I keep the button ID as "PLAY" but change text
+                        
                         else if (type === "SPEED") {
                             if (speedMultiplier === 1) speedMultiplier = 1.5;
                             else if (speedMultiplier === 1.5) speedMultiplier = 0.5;
                             else speedMultiplier = 1;
+                            showFeedback("SPEED: " + speedMultiplier + "x");
                             drawButton("SPEED", speedMultiplier + "x", true);
                         }
                         else if (type === "REWIND") {
                             moveDirection = -1; isPlaying = true;
+                            showFeedback("REWINDING...");
                             drawButton("REWIND", "<<", true);
                             setTimeout(() => { 
                                 moveDirection = 1; 
                                 isPlaying = false; 
-                                drawButton("PLAY", "PLAY", false); 
-                                buttons["PLAY"].mesh.userData.type = "PLAY"; 
+                                showFeedback("PAUSED");
+                                drawButton("PLAY", "PLAY", false); // Reset
                             }, 2000); 
                         }
                         
                         lookTimer = 0; 
                         drawButton(hit.userData.type, hit.userData.type, false); 
-                        activeBtn = null; 
                     }
                 }
             } else {
@@ -350,7 +364,6 @@
             });
         });
 
-        // DOM LOGIC
         const startBtnDOM = document.getElementById('start-btn');
         const overlay = document.getElementById('overlay');
         const instructions = document.getElementById('instruction-block');
@@ -367,7 +380,6 @@
             const timer = setInterval(() => {
                 countdown--;
                 countdownDisplay.innerText = countdown;
-                
                 if (countdown <= 0) {
                     clearInterval(timer);
                     overlay.style.opacity = '0';
@@ -396,8 +408,6 @@
             if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
                 if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) panelAudios[currentActivePanel].stop();
                 if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
-                const text = STORY_DATA[closestPanel] ? STORY_DATA[closestPanel][currentLang] : "";
-                updateSubtitle(text);
                 currentActivePanel = closestPanel;
             }
         }
@@ -410,7 +420,6 @@
             const dt = clock.getDelta();
             if(controls) controls.update();
             
-            // MOVEMENT
             if (isVRActive && isPlaying && hasStarted) {
                 const baseSpeed = 0.008; 
                 worldGroup.position.z += (baseSpeed * speedMultiplier * moveDirection);
@@ -418,10 +427,9 @@
             starField.rotation.y += 0.0005;
             
             if (isVRActive) {
-                // BODY LOCK THE COCKPIT
-                // Lowered to -1.2
-                hudGroup.position.set(camera.position.x, -1.2, camera.position.z - 2.5);
-                startGroup.position.set(camera.position.x, -0.5, camera.position.z - 2.2);
+                // LOCK COCKPIT TO BODY (Follows Position, Not Rotation)
+                hudGroup.position.set(camera.position.x, -1.6, camera.position.z - 2.5);
+                startGroup.position.set(camera.position.x, -0.5, camera.position.z - 2.5);
 
                 updateGaze(dt);
                 checkProximity();
