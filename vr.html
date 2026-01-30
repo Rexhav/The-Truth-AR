@@ -20,8 +20,6 @@
         
         p { font-family: sans-serif; color: #ccc; line-height: 1.6; max-width: 500px; margin-bottom: 30px; }
         
-        .highlight { color: #FFD700; font-weight: bold; }
-
         button {
             padding: 15px 40px; font-size: 1.2rem; background: transparent; 
             color: #FFD700; border: 2px solid #FFD700; border-radius: 50px; 
@@ -29,22 +27,24 @@
         }
         button:hover { background: #FFD700; color: #000; box-shadow: 0 0 20px #FFD700; }
 
-        /* RETICLE */
+        /* CURSORS */
         .reticle {
             position: absolute; top: 50%; width: 12px; height: 12px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
             transform: translate(-50%, -50%); pointer-events: none;
             box-shadow: 0 0 5px white; transition: all 0.2s;
         }
+        /* Loading Animation */
         .reticle.active { 
             background: #FFD700; border-color: #FFD700;
-            transform: translate(-50%, -50%) scale(1.5); 
+            transform: translate(-50%, -50%) scale(2.0); 
+            transition: transform 3s linear; /* 3 Second Load Time */
         }
+        .reticle.clicked { transform: translate(-50%, -50%) scale(1.0); transition: 0.1s; }
         
         #reticle-left { left: 25%; } 
         #reticle-right { left: 75%; }
         
-        /* LANDSCAPE ALERT */
         #landscape-alert {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 999; color: #FFD700;
@@ -65,12 +65,11 @@
     <div id="overlay">
         <h1>VR CINEMA MODE</h1>
         <p>
-            This is an <span class="highlight">automated VR walkthrough</span>.<br><br>
-            Please sit or stand comfortably facing forward.<br>
-            The story will move towards you automatically.<br><br>
-            <span style="font-size: 0.9rem; opacity: 0.8;">Look to your RIGHT to access Play/Pause controls.</span>
+            Please sit or stand comfortably.<br>
+            <strong style="color:#FFD700">Stare at the START button</strong> inside VR to begin.<br><br>
+            The story will flow automatically.
         </p>
-        <button id="start-btn">START JOURNEY</button>
+        <button id="start-btn">ENTER VR</button>
     </div>
 
     <div id="reticle-left" class="reticle"></div>
@@ -91,7 +90,7 @@
         
         // --- SCENE SETUP ---
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x000000, 0.02); // Distance fog to hide end of tunnel
+        scene.fog = new THREE.FogExp2(0x000000, 0.02); 
         
         const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 500);
         
@@ -107,31 +106,20 @@
         const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         scene.add(ambientLight);
 
-        // --- ✨ GOLDEN DUST PARTICLES ✨ ---
+        // --- GOLDEN PARTICLES ---
         const particlesGeo = new THREE.BufferGeometry();
-        const particlesCount = 3000;
+        const particlesCount = 4000;
         const posArray = new Float32Array(particlesCount * 3);
-
-        for(let i = 0; i < particlesCount * 3; i++) {
-            // Random spread around the user
-            posArray[i] = (Math.random() - 0.5) * 100; 
-        }
-
+        for(let i = 0; i < particlesCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 120;
         particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const particlesMat = new THREE.PointsMaterial({
-            size: 0.15,
-            color: 0xFFD700, // Gold
-            transparent: true,
-            opacity: 0.8,
-            blending: THREE.AdditiveBlending
-        });
+        const particlesMat = new THREE.PointsMaterial({ size: 0.12, color: 0xFFD700, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
         const starField = new THREE.Points(particlesGeo, particlesMat);
-        scene.add(starField); // Add to scene (not worldGroup) so they stay around user
+        scene.add(starField);
 
-        // --- 3D PANELS (FAR DISTANCE) ---
+        // --- 3D PANELS (STRETCHED & SLOW) ---
         const textureLoader = new THREE.TextureLoader();
         const panelPositions = []; 
-        const PANEL_DISTANCE = 8.0; // Very far apart for slow cinematic feel
+        const PANEL_DISTANCE = 8.0; 
 
         function createPanel(index, zPos) {
             const group = new THREE.Group();
@@ -139,7 +127,6 @@
             
             ['_bg.png', '_mid.png', '_fg.png'].forEach((suffix, i) => {
                 const zOffsets = [-0.5, -0.2, 0.2];
-                // Massive Scale
                 const scales = [5.5, 4.5, 3.5]; 
                 const path = `assets/panels/panel${index}${suffix}`;
                 textureLoader.load(path, (tex) => {
@@ -150,7 +137,10 @@
                         new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
                     );
                     mesh.position.z = zOffsets[i];
-                    mesh.scale.set(scales[i], scales[i], 1);
+                    
+                    // 🔥 HORIZONTAL STRETCH (1.25x wider)
+                    mesh.scale.set(scales[i] * 1.25, scales[i], 1);
+                    
                     group.add(mesh);
                 });
             });
@@ -159,22 +149,24 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 HUD BUTTONS (RIGHT SIDE) ---
+        // --- 🔘 BUTTON SYSTEM ---
         const buttonGroup = new THREE.Group();
-        camera.add(buttonGroup); // Follows head
+        camera.add(buttonGroup); 
         
-        // Positioned to the RIGHT side (Look right to see controls)
+        // HUD Position (Right Side)
         buttonGroup.position.set(2.0, 0, -3.0); 
-        buttonGroup.rotation.y = -0.5; // Angle toward face
+        buttonGroup.rotation.y = -0.5;
 
-        const buttons = {}; // Store references to update textures
+        // START BUTTON (Center)
+        const startGroup = new THREE.Group();
+        camera.add(startGroup);
+        startGroup.position.set(0, 0, -3.0); // Directly in front
 
-        function createButton(name, y, color) {
+        function createButton(name, y, color, parentGroup) {
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
             
-            // Circular Button
             ctx.fillStyle = "rgba(0,0,0,0.8)";
             ctx.strokeStyle = color;
             ctx.lineWidth = 10;
@@ -183,7 +175,6 @@
             ctx.fill();
             ctx.stroke();
             
-            // Icon/Text
             ctx.fillStyle = color;
             ctx.font = "bold 50px Arial";
             ctx.textAlign = "center";
@@ -197,57 +188,41 @@
             mesh.position.y = y;
             mesh.userData = { type: name };
             
-            buttonGroup.add(mesh);
-            buttons[name] = { mesh, ctx, canvas, tex, color }; // Store for updates
+            parentGroup.add(mesh);
             return mesh;
         }
 
-        // Layout: Vertical Column on Right
-        createButton("RESET", 0.6, "#FF4444");
-        createButton("PAUSE", 0, "#FFD700"); // Middle
-        createButton("PREV", -0.6, "#FFFFFF");
+        // Create HUD Buttons
+        createButton("RESET", 0.6, "#FF4444", buttonGroup);
+        createButton("PAUSE", 0, "#FFD700", buttonGroup); 
+        createButton("PREV", -0.6, "#FFFFFF", buttonGroup);
 
-        // Function to Toggle Play/Pause Text
-        function togglePlayPauseButton(isPaused) {
-            const btn = buttons["PAUSE"];
-            const text = isPaused ? "PLAY" : "PAUSE";
-            const color = isPaused ? "#00FF00" : "#FFD700";
-            
-            // Redraw Canvas
-            const ctx = btn.ctx;
-            ctx.clearRect(0,0,256,256);
-            
-            ctx.fillStyle = "rgba(0,0,0,0.8)";
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 10;
-            ctx.beginPath();
-            ctx.arc(128, 128, 110, 0, Math.PI*2);
-            ctx.fill();
-            ctx.stroke();
-            
-            ctx.fillStyle = color;
-            ctx.fillText(text, 128, 128);
-            
-            btn.tex.needsUpdate = true;
-            btn.mesh.userData.type = text; // Update tag
-        }
+        // Create MAIN START Button
+        const btnStart = createButton("START", 0, "#00FF00", startGroup);
+        btnStart.scale.set(1.5, 1.5, 1.5); // Make it big
 
         // --- RAYCASTER ---
         const raycaster = new THREE.Raycaster();
         const center = new THREE.Vector2(0, 0);
         let lookTimer = 0;
         let activeBtn = null;
-        let isPlaying = true; // Auto-walk state
+        let isPlaying = false; // 🔥 STARTS PAUSED
+        let hasStarted = false; // Flag for initial start
 
         function updateGaze(dt) {
             raycaster.setFromCamera(center, camera);
-            const intersects = raycaster.intersectObjects(buttonGroup.children);
+            
+            // Check both groups (HUD + Start Button)
+            const targets = [...buttonGroup.children, ...startGroup.children];
+            const intersects = raycaster.intersectObjects(targets);
 
             const retL = document.getElementById('reticle-left');
             const retR = document.getElementById('reticle-right');
 
-            if (intersects.length > 0) {
+            if (intersects.length > 0 && intersects[0].object.visible) {
                 const hit = intersects[0].object;
+                
+                // Animate Reticle
                 retL.classList.add('active'); retR.classList.add('active');
 
                 if (activeBtn !== hit) {
@@ -255,32 +230,40 @@
                     lookTimer = 0;
                 } else {
                     lookTimer += dt;
-                    if (lookTimer > 1.2) { // 1.2s Trigger
+                    
+                    // 🔥 3 SECOND HOLD FOR START
+                    const triggerTime = (hit.userData.type === "START") ? 3.0 : 1.5;
+
+                    if (lookTimer > triggerTime) { 
                         const type = hit.userData.type;
                         
-                        if (type === "PAUSE") {
-                            isPlaying = false;
-                            togglePlayPauseButton(true);
-                        } else if (type === "PLAY") {
+                        // Visual Click
+                        retL.classList.remove('active'); retR.classList.remove('active');
+                        retL.classList.add('clicked'); retR.classList.add('clicked');
+
+                        if (type === "START") {
+                            hasStarted = true;
                             isPlaying = true;
-                            togglePlayPauseButton(false);
+                            startGroup.visible = false; // Hide Start Button
+                        } else if (type === "PAUSE") {
+                            isPlaying = !isPlaying; // Toggle
                         } else if (type === "PREV") {
-                            worldGroup.position.z -= 4.0; // Jump back
+                            worldGroup.position.z -= 4.0; 
                         } else if (type === "RESET") {
                             worldGroup.position.z = 0;
                             isPlaying = true;
-                            togglePlayPauseButton(false);
                         }
                         lookTimer = 0; 
                     }
                 }
             } else {
                 retL.classList.remove('active'); retR.classList.remove('active');
+                retL.classList.remove('clicked'); retR.classList.remove('clicked');
                 activeBtn = null; lookTimer = 0;
             }
         }
 
-        // --- AUDIO & LOGIC ---
+        // --- AUDIO ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
         const audioLoader = new THREE.AudioLoader();
@@ -295,7 +278,7 @@
             });
         });
 
-        // --- START ---
+        // --- START DOM BUTTON ---
         let controls = null;
         document.getElementById('start-btn').addEventListener('click', async () => {
             const music = document.getElementById('bg-music');
@@ -310,30 +293,22 @@
 
         let currentActivePanel = -1;
         function checkProximity() {
-            // Panels move toward camera (z=0)
             const camPos = new THREE.Vector3(0,0,0);
             let closestPanel = -1;
             let closestDist = 9999;
-
             panelPositions.forEach(p => {
                 const panelWorldPos = new THREE.Vector3(0, 0, p.z);
                 panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
                 const dist = camPos.distanceTo(panelWorldPos);
-                if (dist < 4.0) { 
-                    if (dist < closestDist) { closestDist = dist; closestPanel = p.id; }
-                }
+                if (dist < 4.0) { if (dist < closestDist) { closestDist = dist; closestPanel = p.id; } }
             });
-
             if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
-                if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) {
-                    panelAudios[currentActivePanel].stop();
-                }
+                if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) panelAudios[currentActivePanel].stop();
                 if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
                 currentActivePanel = closestPanel;
             }
         }
 
-        // --- LOOP ---
         const clock = new THREE.Clock();
         const eyeSep = 0.06;
 
@@ -342,14 +317,12 @@
             const dt = clock.getDelta();
             if(controls) controls.update();
 
-            // 🔥 AUTO WALK
-            if (isPlaying) {
-                worldGroup.position.z += 0.015; // Slow cinematic speed
+            // 🔥 AUTO WALK (SLOW SPEED)
+            if (isPlaying && hasStarted) {
+                worldGroup.position.z += 0.006; // Very slow cinematic speed
             }
 
-            // ✨ ANIMATE DUST
             starField.rotation.y += 0.0005;
-
             updateGaze(dt);
             checkProximity();
 
