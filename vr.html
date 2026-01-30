@@ -21,14 +21,18 @@
             cursor: pointer;
         }
 
-        /* CURSORS (Left/Right Eye) */
+        /* CURSORS */
         .reticle {
-            position: absolute; top: 50%; width: 20px; height: 20px;
+            position: absolute; top: 50%; width: 12px; height: 12px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
             transform: translate(-50%, -50%); pointer-events: none;
-            box-shadow: 0 0 10px white; transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 0 5px white; transition: all 0.2s;
         }
-        .reticle.active { background: #FFD700; transform: translate(-50%, -50%) scale(0.5); }
+        .reticle.active { 
+            background: #FFD700; 
+            border-color: #FFD700;
+            transform: translate(-50%, -50%) scale(1.5); 
+        }
         
         #reticle-left { left: 25%; } 
         #reticle-right { left: 75%; }
@@ -54,7 +58,7 @@
 
     <div id="overlay">
         <h1>VR MODE</h1>
-        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look at buttons on the RIGHT</p>
+        <p>1. Allow Camera<br>2. Rotate Phone<br>3. Look down at buttons to move</p>
         <button id="start-btn">START EXPERIENCE</button>
     </div>
 
@@ -86,22 +90,21 @@
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); // 🔥 BRIGHTER
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         scene.add(ambientLight);
 
-        // --- 🎥 FIX 1: FLAT PLANE CAMERA (NO STRETCH) ---
+        // --- 🎥 CAMERA SPHERE (SPHERICAL VIEW) ---
         const video = document.getElementById('video-source');
         const videoTexture = new THREE.VideoTexture(video);
         videoTexture.minFilter = THREE.LinearFilter;
         videoTexture.magFilter = THREE.LinearFilter;
         
-        // Use a Flat Plane instead of Sphere
-        // Scaled to 16:9 aspect ratio to match phone screen
-        const camGeo = new THREE.PlaneGeometry(32, 18); 
-        const camMat = new THREE.MeshBasicMaterial({ map: videoTexture, depthTest: false, depthWrite: false });
+        const camGeo = new THREE.SphereGeometry(50, 60, 40); 
+        camGeo.scale(-1, 1, 1); 
+        const camMat = new THREE.MeshBasicMaterial({ map: videoTexture });
         const camMesh = new THREE.Mesh(camGeo, camMat);
-        camMesh.position.z = -20; // Far back
-        camera.add(camMesh); // Attached to head
+        
+        camera.add(camMesh);
         scene.add(camera);
 
         // --- 3D PANELS ---
@@ -117,7 +120,6 @@
                 const zOffsets = [-0.3, -0.1, 0.1];
                 const scales = [1.5, 1.2, 1.0];
                 const path = `assets/panels/panel${index}${suffix}`;
-
                 textureLoader.load(path, (tex) => {
                     tex.encoding = THREE.sRGBEncoding;
                     const aspect = tex.image.width / tex.image.height;
@@ -135,45 +137,51 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 FIX 2: VERTICAL SIDE BUTTONS ---
+        // --- 🔘 GLASS UI BUTTONS ---
         const buttonGroup = new THREE.Group();
-        camera.add(buttonGroup); 
+        scene.add(buttonGroup); 
         
-        // Move to the RIGHT side (x=1.6) so panels don't cover them
-        buttonGroup.position.set(1.6, 0, -3); 
-        buttonGroup.rotation.y = -0.3; // Angle slightly towards user
+        // Positioned in WORLD SPACE (Stationary), but close to start
+        buttonGroup.position.set(0, -0.8, -1.2); 
+        buttonGroup.rotation.x = -0.3; // Tilted up slightly
 
-        function createButton(name, y, color) {
+        function createButton(name, x, color) {
             const canvas = document.createElement('canvas');
-            canvas.width = 512; canvas.height = 256;
+            canvas.width = 512; canvas.height = 128; // High Res
             const ctx = canvas.getContext('2d');
             
-            // Button Style
-            ctx.fillStyle = color;
+            // Glass Style Background
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 10;
+            
+            // Round Rect
             ctx.beginPath();
-            ctx.roundRect(0, 0, 512, 256, 40); // Rounded Corners
+            ctx.roundRect(10, 10, 492, 108, 30);
             ctx.fill();
+            ctx.stroke();
             
             // Text
-            ctx.fillStyle = "black";
-            ctx.font = "bold 80px Arial";
+            ctx.fillStyle = color;
+            ctx.font = "bold 60px Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(name, 256, 128);
+            ctx.fillText(name, 256, 64);
             
             const tex = new THREE.CanvasTexture(canvas);
-            const mat = new THREE.MeshBasicMaterial({ map: tex });
-            const geo = new THREE.PlaneGeometry(0.8, 0.4);
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+            const geo = new THREE.PlaneGeometry(0.8, 0.2);
             const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.y = y;
+            mesh.position.x = x;
             mesh.userData = { type: name };
             buttonGroup.add(mesh);
             return mesh;
         }
 
-        // Vertical Layout
-        createButton("NEXT", 0.3, "#00FF00");  // Top
-        createButton("RESET", -0.3, "#FF4444"); // Bottom
+        // Horizontal Layout: PREV | RESET | NEXT
+        createButton("PREV", -0.9, "#FFD700");
+        createButton("RESET", 0, "#FF4444");
+        createButton("NEXT", 0.9, "#00FF00");
 
         // --- RAYCASTER ---
         const raycaster = new THREE.Raycaster();
@@ -183,6 +191,10 @@
         let currentPanelIndex = 0;
 
         function updateGaze(dt) {
+            // Keep buttons near camera, but NOT locked to rotation
+            // They follow your body (position) but you can look away from them
+            // Since camera is at 0,0,0 usually, we just keep them at fixed Z relative to camera
+            
             raycaster.setFromCamera(center, camera);
             const intersects = raycaster.intersectObjects(buttonGroup.children);
 
@@ -198,16 +210,16 @@
                     lookTimer = 0;
                 } else {
                     lookTimer += dt;
-                    if (lookTimer > 0.8) { // Fast Trigger (0.8s)
-                        
-                        // 🔥 FIX 3: INSTANT MOVEMENT
+                    if (lookTimer > 1.0) { // 1.0s Trigger
                         if (hit.userData.type === "NEXT") {
                             moveForward();
+                        } else if (hit.userData.type === "PREV") {
+                            moveBackward();
                         } else if (hit.userData.type === "RESET") {
                             worldGroup.position.z = 0;
                             currentPanelIndex = 0;
                         }
-                        lookTimer = 0; // Reset so it doesn't spam
+                        lookTimer = 0; 
                     }
                 }
             } else {
@@ -217,14 +229,14 @@
         }
 
         function moveForward() {
-            // Instantly slide to next panel
             currentPanelIndex++;
             const targetZ = currentPanelIndex * PANEL_DISTANCE;
-            
-            new TWEEN.Tween(worldGroup.position)
-                .to({ z: targetZ }, 500) // 0.5s Fast Slide
-                .easing(TWEEN.Easing.Quadratic.Out)
-                .start();
+            new TWEEN.Tween(worldGroup.position).to({ z: targetZ }, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+        }
+        function moveBackward() {
+            if(currentPanelIndex > 0) currentPanelIndex--;
+            const targetZ = currentPanelIndex * PANEL_DISTANCE;
+            new TWEEN.Tween(worldGroup.position).to({ z: targetZ }, 500).easing(TWEEN.Easing.Quadratic.Out).start();
         }
 
         // --- AUDIO ---
@@ -241,30 +253,6 @@
                 panelAudios[i] = sound;
             });
         });
-
-        let currentActivePanel = -1;
-        function checkProximity() {
-            const camPos = new THREE.Vector3(0,0,0);
-            let closestPanel = -1;
-            let closestDist = 9999;
-
-            panelPositions.forEach(p => {
-                const panelWorldPos = new THREE.Vector3(0, 0, p.z);
-                panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
-                const dist = camPos.distanceTo(panelWorldPos);
-                if (dist < 1.5) { 
-                    if (dist < closestDist) { closestDist = dist; closestPanel = p.id; }
-                }
-            });
-
-            if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
-                if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) {
-                    panelAudios[currentActivePanel].stop();
-                }
-                if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
-                currentActivePanel = closestPanel;
-            }
-        }
 
         // --- START ---
         let controls = null;
@@ -287,7 +275,26 @@
             }
         });
 
-        // --- LOOP ---
+        let currentActivePanel = -1;
+        function checkProximity() {
+            const camPos = new THREE.Vector3(0,0,0);
+            let closestPanel = -1;
+            let closestDist = 9999;
+            panelPositions.forEach(p => {
+                const panelWorldPos = new THREE.Vector3(0, 0, p.z);
+                panelWorldPos.applyMatrix4(worldGroup.matrixWorld);
+                const dist = camPos.distanceTo(panelWorldPos);
+                if (dist < 1.5) { 
+                    if (dist < closestDist) { closestDist = dist; closestPanel = p.id; }
+                }
+            });
+            if (closestPanel !== -1 && closestPanel !== currentActivePanel) {
+                if (currentActivePanel !== -1 && panelAudios[currentActivePanel]?.isPlaying) panelAudios[currentActivePanel].stop();
+                if (panelAudios[closestPanel]) panelAudios[closestPanel].play();
+                currentActivePanel = closestPanel;
+            }
+        }
+
         const clock = new THREE.Clock();
         const eyeSep = 0.06;
 
@@ -296,7 +303,6 @@
             const dt = clock.getDelta();
             if(controls) controls.update();
             TWEEN.update();
-
             updateGaze(dt);
             checkProximity();
 
