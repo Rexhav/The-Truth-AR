@@ -27,19 +27,19 @@
         }
         button:disabled { background: #333; color: #555; pointer-events: none; }
 
-        /* CURSORS - FIXED (No sizing animation) */
+        /* CURSORS */
         .reticle {
             position: absolute; top: 50%; width: 10px; height: 10px;
             border: 2px solid #FFF; border-radius: 50%; z-index: 50;
             transform: translate(-50%, -50%); pointer-events: none;
             box-shadow: 0 0 4px white;
-            transition: background 0.2s, border-color 0.2s; /* Color only */
+            transition: all 0.2s;
         }
-        
-        /* Active State: Just turns GREEN. No size change. */
+        /* Active State: Turns Gold */
         .reticle.active { 
-            background: #00FF00; 
-            border-color: #00FF00;
+            background: #FFD700; 
+            border-color: #FFD700;
+            transform: translate(-50%, -50%) scale(1.5);
         }
         
         #reticle-left { left: 25%; } 
@@ -63,7 +63,7 @@
             <p style="color:#ccc; line-height:1.6; font-size: 1rem; margin-bottom: 30px;">
                 1. Press Button below.<br>
                 2. Put phone in headset <strong>(10s Timer)</strong>.<br>
-                3. <strong>Look down</strong> to see controls.
+                3. <strong>Look DOWN</strong> at the cockpit to control.
             </p>
             <button id="start-btn">START TIMER</button>
         </div>
@@ -82,7 +82,6 @@
     </script>
 
     <script>
-        // --- 1. GLOBAL VARIABLES (Fixed Scope Error) ---
         let controls = null;
         let isVRActive = false; 
         let isPlaying = false; 
@@ -119,7 +118,6 @@
 
         const worldGroup = new THREE.Group();
         scene.add(worldGroup);
-        
         const ambientLight = new THREE.AmbientLight(0xffffff, 2.0); 
         scene.add(ambientLight);
 
@@ -161,28 +159,30 @@
         }
         for(let i=1; i<=11; i++) createPanel(i, i * PANEL_DISTANCE);
 
-        // --- 🔘 SCENE-LOCKED BUTTONS (WILL NOT MOVE WITH HEAD) 🔘 ---
+        // --- 🔘 COCKPIT UI (SCENE LOCKED) 🔘 ---
         const hudGroup = new THREE.Group();
-        scene.add(hudGroup); // Attached to SCENE
+        scene.add(hudGroup);
         
-        // Position: 0.7m Down, 2.5m Forward (Easy to look at)
-        hudGroup.position.set(0, -0.7, -2.5);
-        hudGroup.rotation.x = -0.3; // Tilted slightly up
+        // Position: 0.8m Down, 2.5m Forward, Tilted Up
+        // This is the "Lap" position
+        hudGroup.position.set(0, -0.8, -2.5);
+        hudGroup.rotation.x = -0.4; 
 
-        // START BUTTON
+        // START BUTTON (Attached to HUD center)
         const startGroup = new THREE.Group();
         scene.add(startGroup);
-        startGroup.position.set(0, 0, -2.5); // Floating right in front
+        startGroup.position.set(0, -0.5, -2.2); // Floating above controls
+        startGroup.rotation.x = -0.2;
 
-        // SUBTITLES
+        // SUBTITLE PLANE
         const subCanvas = document.createElement('canvas');
         subCanvas.width = 1024; subCanvas.height = 128;
         const subCtx = subCanvas.getContext('2d');
         const subTex = new THREE.CanvasTexture(subCanvas);
-        const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true, depthTest: false }); // Always visible
+        const subMat = new THREE.MeshBasicMaterial({ map: subTex, transparent: true, depthTest: false }); 
         const subGeo = new THREE.PlaneGeometry(2.5, 0.3);
         const subMesh = new THREE.Mesh(subGeo, subMat);
-        subMesh.position.y = -0.6;
+        subMesh.position.y = 0.5; // Above buttons
         hudGroup.add(subMesh);
 
         function updateSubtitle(text) {
@@ -201,49 +201,55 @@
 
         const buttons = {};
 
-        function createButton(name, x, color, parentGroup) {
+        function createButton(name, x, parentGroup) {
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d');
             const tex = new THREE.CanvasTexture(canvas);
-            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false }); // Force on top
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
             
             const geo = new THREE.PlaneGeometry(0.5, 0.5); 
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.x = x;
             mesh.userData = { type: name };
             parentGroup.add(mesh);
-            buttons[name] = { mesh, ctx, tex, color, canvas };
-            drawButton(name, name); 
+            buttons[name] = { mesh, ctx, tex, canvas };
+            drawButton(name, name, false); 
             return mesh;
         }
 
-        function drawButton(name, label) {
+        function drawButton(name, label, isHovered) {
             const btn = buttons[name];
             const ctx = btn.ctx;
             ctx.clearRect(0,0,256,256);
-            ctx.fillStyle = "rgba(0,0,0,0.9)"; 
-            ctx.strokeStyle = btn.color;
-            ctx.lineWidth = 20;
+            
+            // Background
+            ctx.fillStyle = "rgba(0, 0, 0, 0.9)"; 
+            ctx.strokeStyle = isHovered ? "#FFFFFF" : "#FFD700"; // White on Hover, Gold Normal
+            ctx.lineWidth = 15;
+            
             ctx.beginPath();
             ctx.arc(128, 128, 110, 0, Math.PI*2);
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = btn.color;
-            ctx.font = "bold 60px Arial";
+            
+            // Text
+            ctx.fillStyle = "#FFD700";
+            ctx.font = "bold 50px Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(label, 128, 128);
+            
             btn.tex.needsUpdate = true;
         }
 
-        // Dashboard Buttons
-        createButton("REWIND", -0.7, "#FFFFFF", hudGroup);
-        createButton("PLAY", 0, "#FFD700", hudGroup);
-        createButton("SPEED", 0.7, "#00FF00", hudGroup);
+        // Layout: Black & Gold Cockpit
+        createButton("REWIND", -0.7, hudGroup);
+        createButton("PLAY", 0, hudGroup);
+        createButton("SPEED", 0.7, hudGroup);
 
-        const btnStart = createButton("START", 0, "#00FF00", startGroup);
-        btnStart.scale.set(2.0, 2.0, 2.0);
+        const btnStart = createButton("START", 0, startGroup);
+        btnStart.scale.set(1.5, 1.5, 1.5);
 
         // --- GAZE LOGIC ---
         const raycaster = new THREE.Raycaster();
@@ -261,10 +267,15 @@
             if (intersects.length > 0 && intersects[0].object.visible) {
                 const hit = intersects[0].object;
                 
-                // Color Change Only (No Sizing)
                 retL.classList.add('active'); retR.classList.add('active');
                 
-                if (activeBtn !== hit) { activeBtn = hit; lookTimer = 0; } 
+                if (activeBtn !== hit) { 
+                    // New Target: Highlight it
+                    if(activeBtn) drawButton(activeBtn.userData.type, activeBtn.userData.type, false); // Unhighlight old
+                    activeBtn = hit; 
+                    drawButton(hit.userData.type, hit.userData.type, true); // Highlight new
+                    lookTimer = 0; 
+                } 
                 else {
                     lookTimer += dt;
                     const triggerTime = (hit.userData.type === "START") ? 2.5 : 1.2;
@@ -273,29 +284,34 @@
                         if (type === "START") { hasStarted = true; isPlaying = true; startGroup.visible = false; } 
                         else if (type === "PLAY" || type === "PAUSE") {
                             isPlaying = !isPlaying;
-                            drawButton("PLAY", isPlaying ? "PAUSE" : "PLAY");
+                            drawButton("PLAY", isPlaying ? "PAUSE" : "PLAY", true);
                             buttons["PLAY"].mesh.userData.type = isPlaying ? "PAUSE" : "PLAY";
                         } 
                         else if (type === "SPEED") {
                             if (speedMultiplier === 1) speedMultiplier = 1.5;
                             else if (speedMultiplier === 1.5) speedMultiplier = 0.5;
                             else speedMultiplier = 1;
-                            drawButton("SPEED", speedMultiplier + "x");
+                            drawButton("SPEED", speedMultiplier + "x", true);
                         }
                         else if (type === "REWIND") {
                             moveDirection = -1; isPlaying = true;
-                            drawButton("REWIND", "<<");
-                            setTimeout(() => { moveDirection = 1; isPlaying = false; drawButton("PLAY", "PLAY"); buttons["PLAY"].mesh.userData.type = "PLAY"; }, 2000); 
+                            drawButton("REWIND", "<<", true);
+                            setTimeout(() => { moveDirection = 1; isPlaying = false; drawButton("PLAY", "PLAY", false); buttons["PLAY"].mesh.userData.type = "PLAY"; }, 2000); 
                         }
-                        // Visual Blink
-                        retL.style.opacity = 0; retR.style.opacity = 0;
-                        setTimeout(() => { retL.style.opacity = 1; retR.style.opacity = 1; }, 200);
+                        
+                        // Reset
                         lookTimer = 0; 
+                        drawButton(hit.userData.type, hit.userData.type, false); // Flash off
+                        activeBtn = null; 
                     }
                 }
             } else {
                 retL.classList.remove('active'); retR.classList.remove('active');
-                activeBtn = null; lookTimer = 0;
+                if(activeBtn) {
+                    drawButton(activeBtn.userData.type, activeBtn.userData.type, false); // Unhighlight
+                    activeBtn = null; 
+                }
+                lookTimer = 0;
             }
         }
 
@@ -335,11 +351,8 @@
                     overlay.style.opacity = '0';
                     setTimeout(() => { 
                         overlay.style.display = 'none'; 
-                        isVRActive = true; // Unlock Gaze
-                        
-                        // Assign to GLOBAL variable (No 'let')
+                        isVRActive = true; 
                         controls = new THREE.DeviceOrientationControls(camera);
-                        
                         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                             try { DeviceOrientationEvent.requestPermission(); } catch(e){}
                         }
@@ -350,7 +363,6 @@
 
         function checkProximity() {
             if (!isVRActive) return;
-            
             const camPos = new THREE.Vector3(0,0,0);
             let closestPanel = -1; let closestDist = 9999;
             panelPositions.forEach(p => {
@@ -376,7 +388,7 @@
             const dt = clock.getDelta();
             if(controls) controls.update();
             
-            // 🔥 SPEED TUNED (0.008)
+            // MOVEMENT
             if (isVRActive && isPlaying && hasStarted) {
                 const baseSpeed = 0.008; 
                 worldGroup.position.z += (baseSpeed * speedMultiplier * moveDirection);
@@ -384,6 +396,10 @@
             starField.rotation.y += 0.0005;
             
             if (isVRActive) {
+                // BODY LOCK THE COCKPIT
+                hudGroup.position.set(camera.position.x, -0.8, camera.position.z - 2.5);
+                startGroup.position.set(camera.position.x, -0.5, camera.position.z - 2.2);
+
                 updateGaze(dt);
                 checkProximity();
             }
